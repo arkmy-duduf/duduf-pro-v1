@@ -4,33 +4,48 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: "3.10"
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.10"
 
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y python3-pip python3-setuptools git zip unzip openjdk-17-jdk
-          pip install --upgrade pip
-          pip install buildozer cython
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y python3-venv openjdk-17-jdk unzip wget git libffi-dev libssl-dev \
+            autoconf automake libtool pkg-config zlib1g-dev
 
-      - name: Build APK (debug)
-        run: |
-          buildozer -v android debug
+    - name: Set Android NDK to r25b
+      run: |
+        wget https://dl.google.com/android/repository/android-ndk-r25b-linux.zip
+        unzip -q android-ndk-r25b-linux.zip -d $ANDROID_SDK_ROOT
+        mv $ANDROID_SDK_ROOT/android-ndk-r25b $ANDROID_SDK_ROOT/ndk-bundle
+        echo "ANDROIDNDK=$ANDROID_SDK_ROOT/ndk-bundle" >> $GITHUB_ENV
+        echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk-bundle" >> $GITHUB_ENV
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: dudufoccas-apk
-          path: bin/*.apk
+    - name: Install Buildozer
+      run: |
+        python -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install buildozer cython
+
+    - name: Build APK
+      run: |
+        source venv/bin/activate
+        buildozer -v android debug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: dudufoccas-apk
+        path: bin/*.apk
