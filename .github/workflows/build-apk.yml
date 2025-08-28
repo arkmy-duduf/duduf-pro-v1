@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK with Buildozer
 
 on:
   push:
@@ -6,8 +6,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  android:
+  build:
     runs-on: ubuntu-latest
+
+    env:
+      ANDROID_SDK_ROOT: ${{ github.workspace }}/.buildozer/android/platform/android-sdk
+      ANDROID_HOME: ${{ github.workspace }}/.buildozer/android/platform/android-sdk
+      ANDROIDSDK: ${{ github.workspace }}/.buildozer/android/platform/android-sdk
+      ANDROIDNDK: ${{ github.workspace }}/.buildozer/android/platform/android-ndk-r25b
+      ANDROIDAPI: "31"
+      ANDROIDMINAPI: "21"
 
     steps:
       - name: Checkout
@@ -16,36 +24,45 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install system deps
+      - name: System deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential git zip unzip ccache \
-            libffi-dev libssl-dev libsqlite3-dev zlib1g-dev \
-            libjpeg-dev libfreetype6-dev \
-            openjdk-17-jdk-headless
-          java -version
+          sudo apt-get install -y zip unzip git libssl-dev libffi-dev liblzma-dev libsqlite3-dev zlib1g-dev
 
-      - name: Install buildozer & deps (in venv)
+      - name: Install Buildozer & Cython
         run: |
-          python -m venv venv
-          source venv/bin/activate
           python -m pip install --upgrade pip
-          pip install "cython==0.29.36" "buildozer==1.5.0" "setuptools<70"
+          pip install "cython<3.1" buildozer==1.5.0
+
+      - name: Prepare SDK directories
+        run: |
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          mkdir -p "$ANDROID_SDK_ROOT/platforms" "$ANDROID_SDK_ROOT/build-tools" "$ANDROID_SDK_ROOT/platform-tools"
+
+      - name: Install Android cmdline-tools (latest)
+        run: |
+          cd /tmp
+          curl -L -o cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q cmdtools.zip
+          # Le zip contient un dossier "cmdline-tools"
+          mv cmdline-tools/* "$ANDROID_SDK_ROOT/cmdline-tools/latest/"
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> $GITHUB_PATH
+
+      - name: Accept licenses & install SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "cmdline-tools;latest" "platforms;android-31" "build-tools;33.0.2"
 
       - name: Build APK (debug)
-        env:
-          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
-          source venv/bin/activate
-          buildozer android debug
+          buildozer -v android debug
 
       - name: Upload APK artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: duduf-occas-apk
-          path: |
-            bin/*.apk
-            .buildozer/android/platform/build-*/dists/*/bin/*.apk
+          path: bin/*.apk
