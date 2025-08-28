@@ -1,0 +1,51 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential git zip unzip ccache \
+            libffi-dev libssl-dev libsqlite3-dev zlib1g-dev \
+            libjpeg-dev libfreetype6-dev \
+            openjdk-17-jdk-headless
+          java -version
+
+      - name: Install buildozer & deps (in venv)
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install "cython==0.29.36" "buildozer==1.5.0" "setuptools<70"
+
+      - name: Build APK (debug)
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+        run: |
+          source venv/bin/activate
+          buildozer android debug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: duduf-occas-apk
+          path: |
+            bin/*.apk
+            .buildozer/android/platform/build-*/dists/*/bin/*.apk
