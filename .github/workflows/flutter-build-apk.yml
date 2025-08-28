@@ -1,0 +1,77 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+
+      - name: Bootstrap Flutter project
+        run: |
+          flutter create . --platforms=android --org com.arkmy --project-name dudufoccas
+
+      - name: Write pubspec.yaml
+        run: |
+          cat > pubspec.yaml <<'YAML'
+          name: dudufoccas
+          description: Duduf Occas by Tony
+          publish_to: "none"
+          version: 0.1.0+1
+
+          environment:
+            sdk: ">=3.4.0 <4.0.0"
+
+          dependencies:
+            flutter:
+              sdk: flutter
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+            flutter_lints: ^4.0.0
+            flutter_launcher_icons: ^0.13.1
+
+          flutter:
+            uses-material-design: true
+            assets:
+              - assets/prices.json
+              - assets/profiles.json
+              - assets/duduf_occas_logo.png
+
+          flutter_icons:
+            android: true
+            ios: false
+            image_path: assets/duduf_occas_logo.png
+            min_sdk_android: 21
+          YAML
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Generate launcher icon
+        run: flutter pub run flutter_launcher_icons
+
+      - name: Set applicationId
+        run: |
+          sed -i 's/applicationId "com.example.dudufoccas"/applicationId "com.arkmy.dudufoccas"/' android/app/build.gradle || true
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: duduf-occas-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
