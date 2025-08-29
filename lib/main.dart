@@ -1,10 +1,7 @@
-// main.dart
 import 'dart:convert';
-import 'dart:math' as math;
-
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,469 +10,488 @@ void main() {
 
 class DudufApp extends StatelessWidget {
   const DudufApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Duduf Occas',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFB86B21)),
         useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          isDense: true,
-          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        ),
       ),
-      home: const HomePage(),
-      debugShowCheckedModeBanner: false,
+      home: const HomeScreen(),
     );
   }
 }
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
-  @override
-  State<HomePage> createState() => _HomePageState();
+/// Données chargées depuis les JSON.
+class AppData {
+  final Map<String, double> densitiesKgM3; // acier, inox, aluminium, fonte…
+  final Map<String, double> pricesPerKg;   // € / kg
+  final Map<String, Map<String, dynamic>> families; // HEA/HEB/IPE/UPN/UPE
+
+  AppData({
+    required this.densitiesKgM3,
+    required this.pricesPerKg,
+    required this.families,
+  });
+
+  static Future<AppData> load() async {
+    final profilesStr = await rootBundle.loadString('assets/profiles.json');
+    final pricesStr   = await rootBundle.loadString('assets/prices.json');
+    final profiles = json.decode(profilesStr) as Map<String, dynamic>;
+    final prices   = json.decode(pricesStr)   as Map<String, dynamic>;
+
+    final densities = (profiles['densities'] as Map)
+        .map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
+
+    final fams = <String, Map<String, dynamic>>{};
+    for (final key in ['HEA','HEB','IPE','UPN','UPE']) {
+      if (profiles.containsKey(key)) {
+        fams[key] = (profiles[key] as Map<String, dynamic>);
+      }
+    }
+
+    final pricesMap = (prices as Map)
+        .map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
+
+    return AppData(
+      densitiesKgM3: densities,
+      pricesPerKg: pricesMap,
+      families: fams,
+    );
+  }
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
-  late final TabController _tab;
+enum Mode { normalise, libre }
 
-  Map<String, dynamic> prices = {};
-  Map<String, dynamic> profiles = {};
-  Map<String, dynamic> densities = {};
-  List<dynamic> profilsLibres = [];
+class ShapeDef {
+  final String id;
+  final String name;
+  final List<DimField> fields; // mm
+  const ShapeDef({required this.id, required this.name, required this.fields});
+}
 
-  String selectedType = 'Tube rond';
-  String selectedMatiere = 'acier';
+class DimField {
+  final String key;
+  final String label;
+  const DimField(this.key, this.label);
+}
 
-  final TextEditingController ctrlDiametre = TextEditingController();
-  final TextEditingController ctrlLargeur  = TextEditingController();
-  final TextEditingController ctrlHauteur  = TextEditingController();
-  final TextEditingController ctrlEp       = TextEditingController();
-  final TextEditingController ctrlLongueur = TextEditingController(text: '1');
+// Profils « libres » (dimensions en mm)
+const List<ShapeDef> kShapes = [
+  ShapeDef(
+    id: 'tube_rond',
+    name: 'Tube rond',
+    fields: [DimField('d_ext','Ø extérieur (mm)'), DimField('e','Épaisseur (mm)')],
+  ),
+  ShapeDef(
+    id: 'tube_carre',
+    name: 'Tube carré',
+    fields: [DimField('c_ext','Côté ext. (mm)'), DimField('e','Épaisseur (mm)')],
+  ),
+  ShapeDef(
+    id: 'tube_rect',
+    name: 'Tube rectangulaire',
+    fields: [DimField('l_ext','Largeur ext. (mm)'), DimField('h_ext','Hauteur (mm)'), DimField('e','Épaisseur (mm)')],
+  ),
+  ShapeDef(
+    id: 'rond_plein',
+    name: 'Rond plein',
+    fields: [DimField('d','Diamètre (mm)')],
+  ),
+  ShapeDef(
+    id: 'carre_plein',
+    name: 'Carré plein',
+    fields: [DimField('c','Côté (mm)')],
+  ),
+  ShapeDef(
+    id: 'rectangle_plein',
+    name: 'Rectangle plein',
+    fields: [DimField('l','Largeur (mm)'), DimField('h','Hauteur (mm)')],
+  ),
+  ShapeDef(
+    id: 'plat',
+    name: 'Plat',
+    fields: [DimField('l','Largeur (mm)'), DimField('e','Épaisseur (mm)')],
+  ),
+  ShapeDef(
+    id: 'corniere_egale',
+    name: 'Cornière égale',
+    fields: [DimField('a','Aile (mm)'), DimField('e','Épaisseur (mm)')],
+  ),
+  ShapeDef(
+    id: 'corniere_inegale',
+    name: 'Cornière inégale',
+    fields: [DimField('a1','Aile 1 (mm)'), DimField('a2','Aile 2 (mm)'), DimField('e','Épaisseur (mm)')],
+  ),
+];
 
-  double poidsKg = 0.0;
-  double prixEur = 0.0;
+double _areaForShape(String id, Map<String, double> mm) {
+  switch (id) {
+    case 'tube_rond':
+      final dExt = mm['d_ext'] ?? 0;
+      final e = mm['e'] ?? 0;
+      final rExt = dExt / 2.0;
+      final rInt = max(0.0, rExt - e);
+      return pi * (rExt * rExt - rInt * rInt);
+    case 'tube_carre':
+      final cExt = mm['c_ext'] ?? 0;
+      final e = mm['e'] ?? 0;
+      final cInt = max(0.0, cExt - 2 * e);
+      return cExt * cExt - cInt * cInt;
+    case 'tube_rect':
+      final lExt = mm['l_ext'] ?? 0;
+      final hExt = mm['h_ext'] ?? 0;
+      final e = mm['e'] ?? 0;
+      final lInt = max(0.0, lExt - 2 * e);
+      final hInt = max(0.0, hExt - 2 * e);
+      return lExt * hExt - lInt * hInt;
+    case 'rond_plein':
+      final d = mm['d'] ?? 0;
+      return pi * pow(d / 2.0, 2);
+    case 'carre_plein':
+      final c = mm['c'] ?? 0;
+      return c * c;
+    case 'rectangle_plein':
+      final l = mm['l'] ?? 0;
+      final h = mm['h'] ?? 0;
+      return l * h;
+    case 'plat':
+      final l = mm['l'] ?? 0;
+      final e = mm['e'] ?? 0;
+      return l * e;
+    case 'corniere_egale':
+      final a = mm['a'] ?? 0;
+      final e = mm['e'] ?? 0;
+      return 2 * a * e - e * e;
+    case 'corniere_inegale':
+      final a1 = mm['a1'] ?? 0;
+      final a2 = mm['a2'] ?? 0;
+      final e = mm['e'] ?? 0;
+      return a1 * e + a2 * e - e * e;
+    default:
+      return 0.0;
+  }
+}
 
-  // +25% (coché par défaut)
-  bool connaisPatron = true;
+double _mm2ToM2(double mm2) => mm2 / 1e6;
+double calcWeightKgFromArea(double areaM2, double lengthM, double densityKgM3) {
+  return areaM2 * lengthM * densityKgM3;
+}
 
-  // Edition prix matière
-  String selectedPrixMatiere = 'acier';
-  final TextEditingController ctrlPrixMatiere = TextEditingController();
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
-  bool loaded = false;
+class _HomeScreenState extends State<HomeScreen> {
+  AppData? data;
+
+  Mode mode = Mode.libre;
+  double lengthM = 1.0;
+  String materialKey = 'acier';
+  String? familyKey;
+  String? profileKey;
+  ShapeDef shape = kShapes.first;
+  final Map<String, TextEditingController> shapeCtrls = {};
+  double? weightKg;
+  double? totalPrice;
+
+  // Ajout: case à cocher "Je connais le patron" (+25%)
+  bool knowsBoss = true;
 
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 2, vsync: this);
-    _loadAll();
-  }
-
-  Future<void> _loadAll() async {
-    final pricesStr = await rootBundle.loadString('assets/prices.json');
-    final profilesStr = await rootBundle.loadString('assets/profiles.json');
-    final Map<String, dynamic> pricesJson = json.decode(pricesStr);
-    final Map<String, dynamic> profilesJson = json.decode(profilesStr);
-
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('saved_prices');
-    Map<String, dynamic> effectivePrices = pricesJson;
-    if (saved != null && saved.isNotEmpty) {
-      try {
-        final Map<String, dynamic> parsed = json.decode(saved);
-        effectivePrices = {...pricesJson, ...parsed};
-      } catch (_) {}
-    }
-
-    setState(() {
-      prices = effectivePrices;
-      profiles = profilesJson;
-      densities = Map<String, dynamic>.from(profilesJson['densities'] ?? {});
-      profilsLibres = List<dynamic>.from(profilesJson['profils_libres'] ?? [
-        'Tube rond','Tube carré','Tube rectangle','Rond plein','Carré plein','Rectangle plein','Cornière','Plat'
-      ]);
-
-      if (prices.keys.isNotEmpty) {
-        selectedMatiere = prices.keys.first;
-        selectedPrixMatiere = selectedMatiere;
-        ctrlPrixMatiere.text = _fmt(prices[selectedPrixMatiere] ?? 0);
+    _load();
+    for (final f in kShapes) {
+      for (final d in f.fields) {
+        shapeCtrls.putIfAbsent('${f.id}:${d.key}', () => TextEditingController());
       }
-      loaded = true;
-    });
-
-    _recalc();
-  }
-
-  @override
-  void dispose() {
-    _tab.dispose();
-    ctrlDiametre.dispose();
-    ctrlLargeur.dispose();
-    ctrlHauteur.dispose();
-    ctrlEp.dispose();
-    ctrlLongueur.dispose();
-    ctrlPrixMatiere.dispose();
-    super.dispose();
-  }
-
-  double _toDouble(TextEditingController c) {
-    return double.tryParse(c.text.replaceAll(',', '.')) ?? 0.0;
-  }
-
-  double _areaTubeRond(double d, double e) {
-    if (d <= 0 || e <= 0 || 2*e >= d) return 0;
-    final ext = d * d;
-    final intd = (d - 2*e) * (d - 2*e);
-    return math.pi / 4.0 * (ext - intd);
-  }
-
-  double _areaTubeCarre(double a, double e) {
-    if (a <= 0 || e <= 0 || 2*e >= a) return 0;
-    final ext = a * a;
-    final intd = (a - 2*e) * (a - 2*e);
-    return ext - intd;
-  }
-
-  double _areaTubeRectangle(double l, double h, double e) {
-    if (l <= 0 || h <= 0 || e <= 0 || 2*e >= l || 2*e >= h) return 0;
-    final ext = l * h;
-    final intd = (l - 2*e) * (h - 2*e);
-    return ext - intd;
-  }
-
-  double _areaRondPlein(double d) {
-    if (d <= 0) return 0;
-    return math.pi / 4.0 * d * d;
-  }
-
-  double _areaCarrePlein(double a) {
-    if (a <= 0) return 0;
-    return a * a;
-  }
-
-  double _areaRectanglePlein(double l, double h) {
-    if (l <= 0 || h <= 0) return 0;
-    return l * h;
-  }
-
-  double _areaCorniere(double l, double h, double e) {
-    if (l <= 0 || h <= 0 || e <= 0 || e > l || e > h) return 0;
-    return e * (l + h - e);
-  }
-
-  double _areaPlat(double l, double e) {
-    if (l <= 0 || e <= 0) return 0;
-    return e * l;
-  }
-
-  double _poidsKg({
-    required String type,
-    required double d,
-    required double l,
-    required double h,
-    required double e,
-    required double longueurM,
-    required double densite,
-  }) {
-    double areaMm2 = 0.0;
-    switch (type) {
-      case 'Tube rond':
-        areaMm2 = _areaTubeRond(d, e);
-        break;
-      case 'Tube carré':
-        areaMm2 = _areaTubeCarre(d, e);
-        break;
-      case 'Tube rectangle':
-        areaMm2 = _areaTubeRectangle(l, h, e);
-        break;
-      case 'Rond plein':
-        areaMm2 = _areaRondPlein(d);
-        break;
-      case 'Carré plein':
-        areaMm2 = _areaCarrePlein(d);
-        break;
-      case 'Rectangle plein':
-        areaMm2 = _areaRectanglePlein(l, h);
-        break;
-      case 'Cornière':
-        areaMm2 = _areaCorniere(l, h, e);
-        break;
-      case 'Plat':
-        areaMm2 = _areaPlat(l, e);
-        break;
-      default:
-        areaMm2 = 0.0;
     }
-    final areaM2 = areaMm2 * 1e-6;
-    return areaM2 * longueurM * densite;
+  }
+
+  Future<void> _load() async {
+    final d = await AppData.load();
+    setState(() {
+      data = d;
+      materialKey = d.pricesPerKg.keys.contains('acier') ? 'acier' : d.pricesPerKg.keys.first;
+      familyKey = d.families.keys.isNotEmpty ? d.families.keys.first : null;
+      if (familyKey != null) {
+        final fam = d.families[familyKey]!;
+        profileKey = fam.keys.isNotEmpty ? fam.keys.first : null;
+      }
+    });
   }
 
   void _recalc() {
-    final mat = selectedMatiere;
-    final densite = (densities[mat] ?? 0).toDouble();
-    final prixKg = (prices[mat] ?? 0).toDouble();
+    if (data == null) return;
+    double kg = 0.0;
 
-    final d = _toDouble(ctrlDiametre);
-    final l = _toDouble(ctrlLargeur);
-    final h = _toDouble(ctrlHauteur);
-    final e = _toDouble(ctrlEp);
-    final longM = _toDouble(ctrlLongueur);
+    if (mode == Mode.normalise) {
+      if (familyKey != null && profileKey != null) {
+        final fam = data!.families[familyKey]!;
+        final prof = fam[profileKey] as Map<String, dynamic>;
+        final poidsM = (prof['poids_m'] as num).toDouble(); // kg/m
+        kg = poidsM * lengthM;
+      }
+    } else {
+      final inputs = <String, double>{};
+      for (final f in shape.fields) {
+        final ctrl = shapeCtrls['${shape.id}:${f.key}']!;
+        final v = double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0.0;
+        inputs[f.key] = v;
+      }
+      final areaMm2 = _areaForShape(shape.id, inputs);
+      final areaM2 = _mm2ToM2(areaMm2);
+      final density = data!.densitiesKgM3[materialKey] ?? 7850.0;
+      kg = calcWeightKgFromArea(areaM2, lengthM, density);
+    }
 
-    final pKg = _poidsKg(
-      type: selectedType,
-      d: d, l: l, h: h, e: e, longueurM: longM, densite: densite,
+    final priceKg = data!.pricesPerKg[materialKey] ?? 0.0;
+    double price = kg * priceKg;
+
+    // +25% si "Je connais le patron" est coché (par défaut vrai)
+    if (knowsBoss) {
+      price *= 1.25;
+    }
+
+    setState(() {
+      weightKg = kg;
+      totalPrice = price;
+    });
+  }
+
+  Widget _buildNumberField(TextEditingController ctrl, String hint) {
+    return SizedBox(
+      width: 160,
+      child: TextField(
+        controller: ctrl,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: InputDecoration(
+          labelText: hint,
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+        onChanged: (_) => _recalc(),
+      ),
     );
-
-    double prix = pKg * prixKg;
-    if (connaisPatron) prix *= 1.25; // +25%
-
-    setState(() {
-      poidsKg = pKg;
-      prixEur = prix;
-    });
   }
-
-  bool _needsD() => {'Tube rond', 'Rond plein', 'Carré plein', 'Tube carré'}.contains(selectedType);
-  bool _needsL() => {'Tube rectangle', 'Rectangle plein', 'Cornière', 'Plat'}.contains(selectedType) || selectedType == 'Tube carré';
-  bool _needsH() => {'Tube rectangle', 'Rectangle plein', 'Cornière'}.contains(selectedType);
-  bool _needsE() => {'Tube rond', 'Tube carré', 'Tube rectangle', 'Cornière', 'Plat'}.contains(selectedType);
-
-  Future<void> _savePrice() async {
-    final v = double.tryParse(ctrlPrixMatiere.text.replaceAll(',', '.'));
-    if (v == null) return;
-    setState(() {
-      prices[selectedPrixMatiere] = v;
-    });
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('saved_prices', json.encode(prices));
-    if (selectedPrixMatiere == selectedMatiere) _recalc();
-  }
-
-  String _fmt(num v, {int decimals = 3}) => v.toStringAsFixed(decimals).replaceAll('.', ',');
 
   @override
   Widget build(BuildContext context) {
-    if (!loaded) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    final matieres = prices.keys.toList();
-    if (!matieres.contains(selectedMatiere) && matieres.isNotEmpty) {
-      selectedMatiere = matieres.first;
-    }
-    if (!matieres.contains(selectedPrixMatiere) && matieres.isNotEmpty) {
-      selectedPrixMatiere = matieres.first;
-    }
-
+    final d = data;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Duduf Occas'),
-        bottom: TabBar(
-          controller: _tab,
-          tabs: const [Tab(text: 'Calcul'), Tab(text: 'Prix matières')],
-        ),
+        centerTitle: true,
       ),
-      body: TabBarView(
-        controller: _tab,
-        children: [_buildCalculTab(matieres), _buildPrixTab(matieres)],
-      ),
+      body: d == null
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SegmentedButton<Mode>(
+                    segments: const [
+                      ButtonSegment(value: Mode.libre, label: Text('Profil libre')),
+                      ButtonSegment(value: Mode.normalise, label: Text('Profil normalisé')),
+                    ],
+                    selected: {mode},
+                    onSelectionChanged: (s) {
+                      setState(() => mode = s.first);
+                      _recalc();
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Text('Matériau: '),
+                      const SizedBox(width: 8),
+                      DropdownButton<String>(
+                        value: materialKey,
+                        items: d.pricesPerKg.keys
+                            .map((k) => DropdownMenuItem(value: k, child: Text(k)))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() => materialKey = v);
+                          _recalc();
+                        },
+                      ),
+                      const SizedBox(width: 24),
+                      SizedBox(
+                        width: 200,
+                        child: TextField(
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            border: OutlineInputBorder(),
+                            labelText: 'Longueur (m)',
+                          ),
+                          onChanged: (t) {
+                            setState(() {
+                              lengthM = double.tryParse(t.replaceAll(',', '.')) ?? 0.0;
+                            });
+                            _recalc();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (mode == Mode.normalise)
+                    _buildNormaliseUI(d)
+                  else
+                    _buildLibreUI(),
+                  const SizedBox(height: 24),
+                  _buildResultCard(d),
+                ],
+              ),
+            ),
     );
   }
 
-  Widget _buildCalculTab(List<String> matieres) {
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        _label('Type'),
-        const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          value: selectedType,
-          items: profilsLibres.map<DropdownMenuItem<String>>((e) {
-            final s = e.toString();
-            return DropdownMenuItem(value: s, child: Text(s));
-          }).toList(),
-          onChanged: (v) {
-            if (v == null) return;
-            setState(() => selectedType = v);
-            _recalc();
-          },
-        ),
-        const SizedBox(height: 14),
-
-        _label('Matière'),
-        const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          value: selectedMatiere,
-          items: matieres.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-          onChanged: (v) {
-            if (v == null) return;
-            setState(() => selectedMatiere = v);
-            _recalc();
-          },
-        ),
-        const SizedBox(height: 14),
-
-        _label('Dimensions (mm)'),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 10, runSpacing: 10,
+  Widget _buildNormaliseUI(AppData d) {
+    final fams = d.families;
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Wrap(
+          runSpacing: 12,
+          spacing: 16,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            if (_needsD())
-              SizedBox(
-                width: 180,
-                child: TextField(
-                  controller: ctrlDiametre,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'D / côté A (mm)',
-                    hintText: 'ex: 50',
-                  ),
-                  onChanged: (_) => _recalc(),
-                ),
-              ),
-            if (_needsL())
-              SizedBox(
-                width: 180,
-                child: TextField(
-                  controller: ctrlLargeur,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: selectedType == 'Tube carré' ? 'Côté A (mm)' : 'Largeur L (mm)',
-                    hintText: 'ex: 40',
-                  ),
-                  onChanged: (_) => _recalc(),
-                ),
-              ),
-            if (_needsH())
-              SizedBox(
-                width: 180,
-                child: TextField(
-                  controller: ctrlHauteur,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Hauteur H (mm)',
-                    hintText: 'ex: 30',
-                  ),
-                  onChanged: (_) => _recalc(),
-                ),
-              ),
-            if (_needsE())
-              SizedBox(
-                width: 180,
-                child: TextField(
-                  controller: ctrlEp,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Épaisseur e (mm)',
-                    hintText: 'ex: 3',
-                  ),
-                  onChanged: (_) => _recalc(),
-                ),
-              ),
+            const Text('Famille:'),
+            DropdownButton<String>(
+              value: familyKey,
+              items: fams.keys.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() {
+                  familyKey = v;
+                  profileKey = fams[v]!.keys.first;
+                });
+                _recalc();
+              },
+            ),
+            const SizedBox(width: 12),
+            const Text('Profil:'),
+            DropdownButton<String>(
+              value: profileKey,
+              items: fams[familyKey]!.keys
+                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                  .toList(),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => profileKey = v);
+                _recalc();
+              },
+            ),
+            Builder(
+              builder: (context) {
+                if (familyKey == null || profileKey == null) return const SizedBox.shrink();
+                final prof = fams[familyKey]![profileKey] as Map<String, dynamic>;
+                final w = (prof['poids_m'] as num).toDouble();
+                return Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Text('Poids linéique: ${w.toStringAsFixed(2)} kg/m',
+                      style: Theme.of(context).textTheme.bodyMedium),
+                );
+              },
+            ),
           ],
         ),
-        const SizedBox(height: 14),
-
-        _label('Longueur (m)'),
-        const SizedBox(height: 6),
-        SizedBox(
-          width: 180,
-          child: TextField(
-            controller: ctrlLongueur,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Longueur',
-              hintText: 'ex: 1.2',
-            ),
-            onChanged: (_) => _recalc(),
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        CheckboxListTile(
-          contentPadding: EdgeInsets.zero,
-          value: connaisPatron,
-          onChanged: (v) { setState(() => connaisPatron = v ?? false); _recalc(); },
-          title: const Text('Je connais le patron (+25%)'),
-          controlAffinity: ListTileControlAffinity.leading,
-        ),
-        const SizedBox(height: 10),
-
-        Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _kv('Poids', '${_fmt(poidsKg, decimals: 3)} kg'),
-                _kv('Prix', '${_fmt(prixEur, decimals: 2)} €'),
-              ],
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildPrixTab(List<String> matieres) {
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        _label('Matière'),
-        const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          value: selectedPrixMatiere,
-          items: matieres.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-          onChanged: (v) {
-            if (v == null) return;
-            setState(() {
-              selectedPrixMatiere = v;
-              ctrlPrixMatiere.text = _fmt(prices[v] ?? 0, decimals: 3);
-            });
-          },
-        ),
-        const SizedBox(height: 14),
-        _label('Prix €/kg'),
-        const SizedBox(height: 6),
-        SizedBox(
-          width: 200,
-          child: TextField(
-            controller: ctrlPrixMatiere,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Prix €/kg',
-              hintText: 'ex: 1.30',
+  Widget _buildLibreUI() {
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButton<ShapeDef>(
+              value: shape,
+              items: kShapes.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => shape = v);
+              },
             ),
-          ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: shape.fields.map((f) {
+                final ctrl = shapeCtrls['${shape.id}:${f.key}']!;
+                return _buildNumberField(ctrl, f.label);
+              }).toList(),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Unités: dimensions en mm. La longueur est en m.',
+              style: Theme.of(context).textTheme.bodySmall,
+            )
+          ],
         ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: _savePrice,
-          icon: const Icon(Icons.save),
-          label: const Text('Enregistrer le prix'),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Ces prix sont enregistrés localement et pris en compte dans le calcul.',
-          style: TextStyle(color: Colors.black54),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _label(String t) => Text(t, style: const TextStyle(fontWeight: FontWeight.w700));
-  Widget _kv(String k, String v) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
-    child: Row(
-      children: [
-        SizedBox(width: 140, child: Text(k, style: const TextStyle(fontWeight: FontWeight.w600))),
-        Expanded(child: Text(v, textAlign: TextAlign.right)),
-      ],
-    ),
-  );
+  Widget _buildResultCard(AppData d) {
+    final priceKg = d.pricesPerKg[materialKey] ?? 0.0;
+    final appliedCoef = knowsBoss ? 1.25 : 1.0;
+    return Card(
+      elevation: 0,
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: DefaultTextStyle(
+          style: Theme.of(context).textTheme.titleMedium!,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Résultats'),
+              const SizedBox(height: 8),
+              Text('Poids total: ${weightKg == null ? '—' : '${weightKg!.toStringAsFixed(2)} kg'}'),
+              Text('Prix au kg ($materialKey): ${priceKg.toStringAsFixed(2)} €'),
+              Text('Coef patron: x${appliedCoef.toStringAsFixed(2)} ${knowsBoss ? '(+25%)' : ''}'),
+              Text('Prix total estimé: ${totalPrice == null ? '—' : '${totalPrice!.toStringAsFixed(2)} €'}'),
+              const SizedBox(height: 8),
+              // Case à cocher "Je connais le patron"
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Je connais le patron'),
+                value: knowsBoss,
+                onChanged: (v) {
+                  setState(() => knowsBoss = v ?? false);
+                  _recalc();
+                },
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.icon(
+                  onPressed: _recalc,
+                  icon: const Icon(Icons.calculate),
+                  label: const Text('Calculer'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
