@@ -23,7 +23,6 @@ class DudufApp extends StatelessWidget {
   }
 }
 
-/// Données chargées depuis les JSON.
 class AppData {
   final Map<String, double> densitiesKgM3;
   final Map<String, double> pricesPerKg;
@@ -37,15 +36,15 @@ class AppData {
 
   static Future<AppData> load() async {
     final profilesStr = await rootBundle.loadString('assets/profiles.json');
-    final pricesStr = await rootBundle.loadString('assets/prices.json');
+    final pricesStr   = await rootBundle.loadString('assets/prices.json');
     final profiles = json.decode(profilesStr) as Map<String, dynamic>;
-    final prices = json.decode(pricesStr) as Map<String, dynamic>;
+    final prices   = json.decode(pricesStr)   as Map<String, dynamic>;
 
     final densities = (profiles['densities'] as Map)
         .map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
 
     final fams = <String, Map<String, dynamic>>{};
-    for (final key in ['HEA', 'HEB', 'IPE', 'UPN', 'UPE']) {
+    for (final key in ['HEA','HEB','IPE','UPN','UPE']) {
       if (profiles.containsKey(key)) {
         fams[key] = (profiles[key] as Map<String, dynamic>);
       }
@@ -81,61 +80,47 @@ const List<ShapeDef> kShapes = [
   ShapeDef(
     id: 'tube_rond',
     name: 'Tube rond',
-    fields: [
-      DimField('d_ext', 'Ø extérieur (mm)'),
-      DimField('e', 'Épaisseur (mm)')
-    ],
+    fields: [DimField('d_ext','Ø extérieur (mm)'), DimField('e','Épaisseur (mm)')],
   ),
   ShapeDef(
     id: 'tube_carre',
     name: 'Tube carré',
-    fields: [
-      DimField('c_ext', 'Côté ext. (mm)'),
-      DimField('e', 'Épaisseur (mm)')
-    ],
+    fields: [DimField('c_ext','Côté ext. (mm)'), DimField('e','Épaisseur (mm)')],
   ),
   ShapeDef(
     id: 'tube_rect',
     name: 'Tube rectangulaire',
-    fields: [
-      DimField('l_ext', 'Largeur ext. (mm)'),
-      DimField('h_ext', 'Hauteur ext. (mm)'),
-      DimField('e', 'Épaisseur (mm)')
-    ],
+    fields: [DimField('l_ext','Largeur ext. (mm)'), DimField('h_ext','Hauteur ext. (mm)'), DimField('e','Épaisseur (mm)')],
   ),
   ShapeDef(
     id: 'rond_plein',
     name: 'Rond plein',
-    fields: [DimField('d', 'Diamètre (mm)')],
+    fields: [DimField('d','Diamètre (mm)')],
   ),
   ShapeDef(
     id: 'carre_plein',
     name: 'Carré plein',
-    fields: [DimField('c', 'Côté (mm)')],
+    fields: [DimField('c','Côté (mm)')],
   ),
   ShapeDef(
     id: 'rectangle_plein',
     name: 'Rectangle plein',
-    fields: [DimField('l', 'Largeur (mm)'), DimField('h', 'Hauteur (mm)')],
+    fields: [DimField('l','Largeur (mm)'), DimField('h','Hauteur (mm)')],
   ),
   ShapeDef(
     id: 'plat',
     name: 'Plat',
-    fields: [DimField('l', 'Largeur (mm)'), DimField('e', 'Épaisseur (mm)')],
+    fields: [DimField('l','Largeur (mm)'), DimField('e','Épaisseur (mm)')],
   ),
   ShapeDef(
     id: 'corniere_egale',
     name: 'Cornière égale',
-    fields: [DimField('a', 'Aile (mm)'), DimField('e', 'Épaisseur (mm)')],
+    fields: [DimField('a','Aile (mm)'), DimField('e','Épaisseur (mm)')],
   ),
   ShapeDef(
     id: 'corniere_inegale',
     name: 'Cornière inégale',
-    fields: [
-      DimField('a1', 'Aile 1 (mm)'),
-      DimField('a2', 'Aile 2 (mm)'),
-      DimField('e', 'Épaisseur (mm)')
-    ],
+    fields: [DimField('a1','Aile 1 (mm)'), DimField('a2','Aile 2 (mm)'), DimField('e','Épaisseur (mm)')],
   ),
 ];
 
@@ -210,7 +195,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final Map<String, TextEditingController> shapeCtrls = {};
   double? weightKg;
   double? totalPrice;
-  bool knowsBoss = false; // bouton je connais le patron
+
+  // <-- AJOUT du bouton "Je connais le patron"
+  bool knowsBoss = false;
 
   @override
   void initState() {
@@ -218,8 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _load();
     for (final f in kShapes) {
       for (final d in f.fields) {
-        shapeCtrls.putIfAbsent(
-            '${f.id}:${d.key}', () => TextEditingController());
+        shapeCtrls.putIfAbsent('${f.id}:${d.key}', () => TextEditingController());
       }
     }
   }
@@ -228,9 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final d = await AppData.load();
     setState(() {
       data = d;
-      materialKey = d.pricesPerKg.keys.contains('acier')
-          ? 'acier'
-          : d.pricesPerKg.keys.first;
+      materialKey = d.pricesPerKg.keys.contains('acier') ? 'acier' : d.pricesPerKg.keys.first;
       familyKey = d.families.keys.first;
       profileKey = d.families[familyKey]!.keys.first;
     });
@@ -261,8 +245,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final priceKg = data!.pricesPerKg[materialKey] ?? 0.0;
-    var price = kg * priceKg;
+    double price = kg * priceKg;
 
+    // <-- application du +25% si le bouton est coché
     if (knowsBoss) {
       price *= 1.25;
     }
@@ -306,11 +291,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   SegmentedButton<Mode>(
                     segments: const [
-                      ButtonSegment(
-                          value: Mode.libre, label: Text('Profil libre')),
-                      ButtonSegment(
-                          value: Mode.normalise,
-                          label: Text('Profil normalisé')),
+                      ButtonSegment(value: Mode.libre, label: Text('Profil libre')),
+                      ButtonSegment(value: Mode.normalise, label: Text('Profil normalisé')),
                     ],
                     selected: {mode},
                     onSelectionChanged: (s) {
@@ -326,8 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       DropdownButton<String>(
                         value: materialKey,
                         items: d.pricesPerKg.keys
-                            .map((k) =>
-                                DropdownMenuItem(value: k, child: Text(k)))
+                            .map((k) => DropdownMenuItem(value: k, child: Text(k)))
                             .toList(),
                         onChanged: (v) {
                           if (v == null) return;
@@ -339,8 +320,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       SizedBox(
                         width: 200,
                         child: TextField(
-                          keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: const InputDecoration(
                             isDense: true,
                             border: OutlineInputBorder(),
@@ -348,9 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           onChanged: (t) {
                             setState(() {
-                              lengthM =
-                                  double.tryParse(t.replaceAll(',', '.')) ??
-                                      0.0;
+                              lengthM = double.tryParse(t.replaceAll(',', '.')) ?? 0.0;
                             });
                             _recalc();
                           },
@@ -386,9 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const Text('Famille:'),
             DropdownButton<String>(
               value: familyKey,
-              items: fams.keys
-                  .map((f) => DropdownMenuItem(value: f, child: Text(f)))
-                  .toList(),
+              items: fams.keys.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
               onChanged: (v) {
                 if (v == null) return;
                 setState(() {
@@ -413,8 +389,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Builder(
               builder: (context) {
-                final prof =
-                    fams[familyKey]![profileKey] as Map<String, dynamic>;
+                final prof = fams[familyKey]![profileKey] as Map<String, dynamic>;
                 final w = (prof['poids_m'] as num).toDouble();
                 return Padding(
                   padding: const EdgeInsets.only(left: 8),
@@ -440,10 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             DropdownButton<ShapeDef>(
               value: shape,
-              items: kShapes
-                  .map((s) =>
-                      DropdownMenuItem(value: s, child: Text(s.name)))
-                  .toList(),
+              items: kShapes.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
               onChanged: (v) {
                 if (v == null) return;
                 setState(() => shape = v);
@@ -481,26 +453,26 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Résultats'),
+              Text('Résultats'),
               const SizedBox(height: 8),
               Text('Poids total: ${weightKg == null ? '—' : '${weightKg!.toStringAsFixed(2)} kg'}'),
               Text('Prix au kg (${materialKey}): ${priceKg.toStringAsFixed(2)} €'),
               Text('Prix total estimé: ${totalPrice == null ? '—' : '${totalPrice!.toStringAsFixed(2)} €'}'),
-              Row(
-                children: [
-                  Checkbox(
-                    value: knowsBoss,
-                    onChanged: (v) {
-                      setState(() {
-                        knowsBoss = v ?? false;
-                      });
-                      _recalc();
-                    },
-                  ),
-                  const Text("Je connais le patron (+25%)"),
-                ],
-              ),
               const SizedBox(height: 12),
+
+              // <-- Checkbox ajoutée
+              CheckboxListTile(
+                value: knowsBoss,
+                onChanged: (v) {
+                  setState(() => knowsBoss = v ?? false);
+                  _recalc();
+                },
+                title: const Text('Je connais le patron (+25%)'),
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+
               Align(
                 alignment: Alignment.centerLeft,
                 child: FilledButton.icon(
