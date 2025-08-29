@@ -45,9 +45,12 @@ class AppData {
         .map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
 
     final fams = <String, Map<String, dynamic>>{};
-    for (final key in ['HEA','HEB','IPE','UPN','UPE']) {
+    for (final key in ['HEA','HEB','IPE','UPN','UPE','IPN']) {
       if (profiles.containsKey(key)) {
-        fams[key] = (profiles[key] as Map<String, dynamic>);
+        // chaque profil = { "poids_m": <num>, ... }
+        final raw = profiles[key] as Map<String, dynamic>;
+        // on s’assure d’avoir un Map<String, Map<String,dynamic>>
+        fams[key] = raw.map((k, v) => MapEntry(k.toString(), v as Map<String, dynamic>));
       }
     }
 
@@ -92,7 +95,7 @@ const List<ShapeDef> kShapes = [
   ShapeDef(
     id: 'tube_rect',
     name: 'Tube rectangulaire',
-    fields: [DimField('l_ext','Largeur ext. (mm)'), DimField('h_ext','Hauteur ext. (mm)'), DimField('e','Épaisseur (mm)')],
+    fields: [DimField('l_ext','Largeur (mm)'), DimField('h_ext','Hauteur (mm)'), DimField('e','Épaisseur (mm)')],
   ),
   ShapeDef(
     id: 'rond_plein',
@@ -195,6 +198,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String? profileKey;
   ShapeDef shape = kShapes.first;
   final Map<String, TextEditingController> shapeCtrls = {};
+
+  // ✅ bouton « Je connais le patron » (décoché par défaut)
+  bool _knowBoss = false;
+
   double? weightKg;
   double? totalPrice;
 
@@ -227,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (familyKey != null && profileKey != null) {
         final fam = data!.families[familyKey]!;
         final prof = fam[profileKey] as Map<String, dynamic>;
-        final poidsM = ((prof['kg_m'] ?? prof['poids_m']) as num).toDouble(); // ✅ fix
+        final poidsM = (prof['poids_m'] as num).toDouble(); // kg/m
         kg = poidsM * lengthM;
       }
     } else {
@@ -244,7 +251,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final priceKg = data!.pricesPerKg[materialKey] ?? 0.0;
-    final price = kg * priceKg;
+    var price = kg * priceKg;
+
+    // ✅ maj +25% si checkbox cochée
+    if (_knowBoss) price *= 1.25;
 
     setState(() {
       weightKg = kg;
@@ -384,7 +394,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Builder(
               builder: (context) {
                 final prof = fams[familyKey]![profileKey] as Map<String, dynamic>;
-                final w = ((prof['kg_m'] ?? prof['poids_m']) as num).toDouble(); // ✅ fix
+                final w = (prof['poids_m'] as num).toDouble();
                 return Padding(
                   padding: const EdgeInsets.only(left: 8),
                   child: Text('Poids linéique: ${w.toStringAsFixed(2)} kg/m',
@@ -460,6 +470,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.calculate),
                   label: const Text('Calculer'),
                 ),
+              ),
+              const SizedBox(height: 8),
+              // ✅ la checkbox « Je connais le patron » (décochée par défaut)
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: const Text('Je connais le patron (+25%)'),
+                value: _knowBoss,
+                onChanged: (val) {
+                  setState(() => _knowBoss = val ?? false);
+                  _recalc();
+                },
               ),
             ],
           ),
