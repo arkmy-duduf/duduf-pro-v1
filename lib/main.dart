@@ -92,7 +92,7 @@ const List<ShapeDef> kShapes = [
   ShapeDef(
     id: 'tube_rect',
     name: 'Tube rectangulaire',
-    fields: [DimField('l_ext','Largeur ext. (mm)'), DimField('h_ext','Hauteur (mm)'), DimField('e','Épaisseur (mm)')],
+    fields: [DimField('l_ext','Largeur ext. (mm)'), DimField('h_ext','Hauteur ext. (mm)'), DimField('e','Épaisseur (mm)')],
   ),
   ShapeDef(
     id: 'rond_plein',
@@ -198,9 +198,6 @@ class _HomeScreenState extends State<HomeScreen> {
   double? weightKg;
   double? totalPrice;
 
-  // Ajout: case à cocher "Je connais le patron" (+25%)
-  bool knowsBoss = true;
-
   @override
   void initState() {
     super.initState();
@@ -217,11 +214,8 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       data = d;
       materialKey = d.pricesPerKg.keys.contains('acier') ? 'acier' : d.pricesPerKg.keys.first;
-      familyKey = d.families.keys.isNotEmpty ? d.families.keys.first : null;
-      if (familyKey != null) {
-        final fam = d.families[familyKey]!;
-        profileKey = fam.keys.isNotEmpty ? fam.keys.first : null;
-      }
+      familyKey = d.families.keys.first;
+      profileKey = d.families[familyKey]!.keys.first;
     });
   }
 
@@ -233,7 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (familyKey != null && profileKey != null) {
         final fam = data!.families[familyKey]!;
         final prof = fam[profileKey] as Map<String, dynamic>;
-        final poidsM = (prof['poids_m'] as num).toDouble(); // kg/m
+        final poidsM = ((prof['kg_m'] ?? prof['poids_m']) as num).toDouble(); // ✅ fix
         kg = poidsM * lengthM;
       }
     } else {
@@ -250,12 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final priceKg = data!.pricesPerKg[materialKey] ?? 0.0;
-    double price = kg * priceKg;
-
-    // +25% si "Je connais le patron" est coché (par défaut vrai)
-    if (knowsBoss) {
-      price *= 1.25;
-    }
+    final price = kg * priceKg;
 
     setState(() {
       weightKg = kg;
@@ -394,9 +383,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Builder(
               builder: (context) {
-                if (familyKey == null || profileKey == null) return const SizedBox.shrink();
                 final prof = fams[familyKey]![profileKey] as Map<String, dynamic>;
-                final w = (prof['poids_m'] as num).toDouble();
+                final w = ((prof['kg_m'] ?? prof['poids_m']) as num).toDouble(); // ✅ fix
                 return Padding(
                   padding: const EdgeInsets.only(left: 8),
                   child: Text('Poids linéique: ${w.toStringAsFixed(2)} kg/m',
@@ -449,7 +437,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildResultCard(AppData d) {
     final priceKg = d.pricesPerKg[materialKey] ?? 0.0;
-    final appliedCoef = knowsBoss ? 1.25 : 1.0;
     return Card(
       elevation: 0,
       color: Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -463,23 +450,9 @@ class _HomeScreenState extends State<HomeScreen> {
               Text('Résultats'),
               const SizedBox(height: 8),
               Text('Poids total: ${weightKg == null ? '—' : '${weightKg!.toStringAsFixed(2)} kg'}'),
-              Text('Prix au kg ($materialKey): ${priceKg.toStringAsFixed(2)} €'),
-              Text('Coef patron: x${appliedCoef.toStringAsFixed(2)} ${knowsBoss ? '(+25%)' : ''}'),
+              Text('Prix au kg (${materialKey}): ${priceKg.toStringAsFixed(2)} €'),
               Text('Prix total estimé: ${totalPrice == null ? '—' : '${totalPrice!.toStringAsFixed(2)} €'}'),
-              const SizedBox(height: 8),
-              // Case à cocher "Je connais le patron"
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Je connais le patron'),
-                value: knowsBoss,
-                onChanged: (v) {
-                  setState(() => knowsBoss = v ?? false);
-                  _recalc();
-                },
-                controlAffinity: ListTileControlAffinity.leading,
-                dense: true,
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerLeft,
                 child: FilledButton.icon(
