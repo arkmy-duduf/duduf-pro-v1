@@ -1,10 +1,19 @@
 name: duduf_occas
+<<<<<<< HEAD
 description: Calcul poids/prix métaux (profils normalisés & libres)
 publish_to: "none"
 version: 1.0.0+1
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
+=======
+description: Calculateur de poids de ferraille (Duduf Ocas)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+>>>>>>> 3ddf32c (first commit duduf occas)
 
 dependencies:
   flutter:
@@ -13,6 +22,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+<<<<<<< HEAD
   flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.13.1
 
@@ -31,3 +41,12 @@ flutter_icons:
   image_path: assets/duduf_occas_logo.png
   adaptive_icon_background: "#ffffff"
   adaptive_icon_foreground: assets/duduf_occas_logo.png
+=======
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    # plus tard tu pourras ajouter un logo/icône ici
+    # - assets/logo.png
+>>>>>>> 3ddf32c (first commit duduf occas)

@@ -1,0 +1,16 @@
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+build/
+**/GeneratedPluginRegistrant.*
+
+# Android builds
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# Signing (ne jamais committer)
+key.properties
+android/app/upload-keystore.jks
