@@ -9,6 +9,7 @@ class DudufOccasApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Duduf Occas',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF2563EB),
@@ -28,7 +29,7 @@ class DudufOccasApp extends StatelessWidget {
           fillColor: Color(0xFFF7F8FA),
           contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
-        cardTheme: const CardTheme(
+        cardTheme: const CardThemeData(
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(16)),
@@ -46,7 +47,6 @@ class DudufOccasApp extends StatelessWidget {
         ),
       ),
       home: const DudufHomePage(),
-      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -60,45 +60,23 @@ class DudufHomePage extends StatefulWidget {
 }
 
 class _DudufHomePageState extends State<DudufHomePage> {
-  // Navigation
   int _navIndex = 0;
-
-  // Mode
   Mode mode = Mode.normalise;
 
-  // Normalisés
+  // Sélections
   String? selectedSerie;
   String? selectedTaille;
-
-  // Libres
   String? selectedProfilLibre;
+  String? selectedMatiere = 'Acier';
+
   // Dimensions (mm)
   double dExt = 100, ep = 5, cote = 100, larg = 100, haut = 50, dPlein = 30, aile = 50, aile2 = 40;
 
-  // Matière
-  String? selectedMatiere = 'Acier';
-  final Map<String, double> densites = {
-    'Acier': 7850,
-    'Inox': 8000,
-    'Aluminium': 2700,
-    'Fonte': 7200,
-    'Cuivre': 8960,
-    'Laiton': 8500,
-  };
-
-  // Prix €/kg (modifiable)
-  final Map<String, double> prixKg = {
-    'Acier': 1.30,
-    'Aluminium': 5.00,
-    'Inox': 5.00,
-    'Fonte': 2.00,
-  };
-
-  // Longueur & quantité (communs)
+  // Longueur & quantité
   double longueurM = 1.0;
   int quantite = 1;
 
-  // Table kg/m acier (≈ EN 10365 usuelles)
+  // Tables normalisées (kg/m acier ≈ EN 10365 usuelles)
   final Map<String, Map<String, double>> poidsParMetre = {
     'HEA': {
       '100': 17.0, '120': 20.3, '140': 25.1, '160': 31.0, '180': 36.2,
@@ -134,6 +112,7 @@ class _DudufHomePageState extends State<DudufHomePage> {
     },
   };
 
+  // Profils libres disponibles
   final List<String> profilsLibres = [
     'Tube rond',
     'Tube carré',
@@ -147,8 +126,26 @@ class _DudufHomePageState extends State<DudufHomePage> {
     'Plat',
   ];
 
+  // Densités kg/m3
+  final Map<String, double> densites = {
+    'Acier': 7850,
+    'Inox': 8000,
+    'Aluminium': 2700,
+    'Fonte': 7200,
+    'Cuivre': 8960,
+    'Laiton': 8500,
+  };
+
+  // Prix €/kg (éditables)
+  final Map<String, double> prixKg = {
+    'Acier': 1.30,
+    'Aluminium': 5.00,
+    'Inox': 5.00,
+    'Fonte': 2.00,
+  };
+
   // ======== CALCULS ========
-  double? _densiteSel() => densites[selectedMatiere];
+  double? _densiteSel() => selectedMatiere == null ? null : densites[selectedMatiere!];
   double? _prixKgSel() => selectedMatiere == null ? null : prixKg[selectedMatiere!];
 
   double? poidsUnitaireKgM() {
@@ -157,7 +154,7 @@ class _DudufHomePageState extends State<DudufHomePage> {
 
     if (mode == Mode.normalise) {
       if (selectedSerie == null || selectedTaille == null) return null;
-      final kgmAcier = poidsParMetre[selectedSerie!]![selectedTaille!];
+      final kgmAcier = poidsParMetre[selectedSerie!]?[selectedTaille!];
       if (kgmAcier == null) return null;
       return kgmAcier * (densite / 7850.0);
     } else {
@@ -176,8 +173,8 @@ class _DudufHomePageState extends State<DudufHomePage> {
         _ => null,
       };
       if (aireMm2 == null) return null;
-      final aireM2 = aireMm2 * 1e-6;
-      return densite * aireM2;
+      final aireM2 = aireMm2 * 1e-6; // mm² -> m²
+      return densite * aireM2; // kg/m
     }
   }
 
@@ -194,23 +191,20 @@ class _DudufHomePageState extends State<DudufHomePage> {
     return tot * pKg;
   }
 
-  // Aires (mm²) sécurisées (clamp)
+  // Aires (mm²) avec sécurité
   double _aireTubeRond(double D, double t) {
     final dInt = (D - 2 * t).clamp(0, double.infinity);
     return math.pi * (math.pow(D, 2) - math.pow(dInt, 2)) / 4.0;
   }
-
   double _aireTubeCarre(double a, double t) {
     final ai = (a - 2 * t).clamp(0, double.infinity);
     return a * a - ai * ai;
   }
-
   double _aireTubeRect(double a, double b, double t) {
     final ai = (a - 2 * t).clamp(0, double.infinity);
     final bi = (b - 2 * t).clamp(0, double.infinity);
     return a * b - ai * bi;
   }
-
   double _aireCorniereEgale(double a, double t) => (2 * a - t).clamp(0, double.infinity) * t;
   double _aireCorniereInegale(double a1, double a2, double t) => (a1 + a2 - t).clamp(0, double.infinity) * t;
   double _aireTe(double aile, double h, double t) => (aile * t + (h - t).clamp(0, double.infinity) * t);
@@ -218,18 +212,16 @@ class _DudufHomePageState extends State<DudufHomePage> {
   // ======== UI ========
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[
-      _pageCalcul(context),
-      _pageMatiere(context),
-      _pageResultats(context),
-    ];
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Duduf Occas'),
-        actions: const [SizedBox(width: 8)],
+      appBar: AppBar(title: const Text('Duduf Occas')),
+      body: IndexedStack(
+        index: _navIndex,
+        children: [
+          _pageCalcul(context),
+          _pageMatiere(context),
+          _pageResultats(context),
+        ],
       ),
-      body: AnimatedSwitcher(duration: const Duration(milliseconds: 200), child: pages[_navIndex]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
         onDestinationSelected: (i) => setState(() => _navIndex = i),
@@ -242,249 +234,53 @@ class _DudufHomePageState extends State<DudufHomePage> {
     );
   }
 
-  // ======== PAGES ========
   Widget _pageCalcul(BuildContext context) {
     final pu = poidsUnitaireKgM();
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          SectionCard(
-            title: 'Mode de calcul',
-            children: [
-              SegmentedButton<Mode>(
-                segments: const [
-                  ButtonSegment(value: Mode.normalise, label: Text('Normalisé'), icon: Icon(Icons.account_tree)),
-                  ButtonSegment(value: Mode.libre, label: Text('Libre'), icon: Icon(Icons.tune)),
-                ],
-                selected: {mode},
-                onSelectionChanged: (s) => setState(() {
-                  mode = s.first;
-                  selectedSerie = null;
-                  selectedTaille = null;
-                  selectedProfilLibre = null;
-                }),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          if (mode == Mode.normalise)
-            SectionCard(
-              title: 'Profil normalisé',
-              subtitle: 'Choisis la série et la taille',
-              children: [_normaliseCardInner()],
-            )
-          else
-            SectionCard(
-              title: 'Profil libre',
-              subtitle: 'Renseigne les dimensions (en mm)',
-              children: [_libreCardInner()],
+      child: Column(children: [
+        SectionCard(
+          title: 'Mode de calcul',
+          children: [
+            SegmentedButton<Mode>(
+              segments: const [
+                ButtonSegment(value: Mode.normalise, label: Text('Normalisé'), icon: Icon(Icons.account_tree)),
+                ButtonSegment(value: Mode.libre, label: Text('Libre'), icon: Icon(Icons.tune)),
+              ],
+              selected: {mode},
+              onSelectionChanged: (s) => setState(() {
+                mode = s.first;
+                selectedSerie = null;
+                selectedTaille = null;
+                selectedProfilLibre = null;
+              }),
             ),
-
-          const SizedBox(height: 12),
-
-          SectionCard(
-            title: 'Longueur & quantité',
-            children: [
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  LabeledNumberField(
-                    label: 'Longueur',
-                    unit: 'm',
-                    value: longueurM,
-                    icon: Icons.straighten,
-                    onChanged: (v) => setState(() => longueurM = v.clamp(0.01, 9999)),
-                  ),
-                  QuantityStepper(
-                    value: quantite,
-                    onChanged: (v) => setState(() => quantite = v.clamp(1, 9999)),
-                  ),
-                ],
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (mode == Mode.normalise)
+          SectionCard(title: 'Profil normalisé', children: [_normaliseCardInner()])
+        else
+          SectionCard(title: 'Profil libre', children: [_libreCardInner(), const SizedBox(height: 8), _libreInputs()]),
+        const SizedBox(height: 12),
+        SectionCard(
+          title: 'Longueur & quantité',
+          children: [
+            Wrap(spacing: 12, runSpacing: 12, children: [
+              LabeledNumberField(
+                label: 'Longueur', unit: 'm', value: longueurM, icon: Icons.straighten,
+                onChanged: (v) => setState(() => longueurM = v.clamp(0.01, 9999)),
               ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-          if (pu != null) _ResultBadge(title: 'Poids unitaire', value: '${pu.toStringAsFixed(2)} kg/m', icon: Icons.scale),
-        ],
-      ),
+              QuantityStepper(value: quantite, onChanged: (v) => setState(() => quantite = v.clamp(1, 9999))),
+            ]),
+          ],
+        ),
+        if (pu != null)
+          _ResultBadge(title: 'Poids unitaire', value: '${pu.toStringAsFixed(2)} kg/m', icon: Icons.scale),
+      ]),
     );
   }
 
-  Widget _pageMatiere(BuildContext context) {
-    final pKg = _prixKgSel();
-    final controller = TextEditingController(text: pKg != null ? pKg.toStringAsFixed(2) : '');
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          SectionCard(
-            title: 'Matière',
-            subtitle: 'Densité et tarif appliqués aux calculs',
-            children: [
-              DropdownButtonFormField<String>(
-                value: selectedMatiere,
-                decoration: const InputDecoration(labelText: 'Matière'),
-                items: densites.keys.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                onChanged: (v) => setState(() => selectedMatiere = v),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: const Text('Densités (kg/m³)'),
-                subtitle: Text(densites.entries.map((e) => '${e.key}: ${e.value.toStringAsFixed(0)}').join(' · ')),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SectionCard(
-            title: 'Tarif €/kg',
-            subtitle: 'Modifie le prix de la matière sélectionnée',
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: controller,
-                      decoration: const InputDecoration(
-                        labelText: 'Tarif (€/kg)',
-                        prefixIcon: Icon(Icons.euro),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (v) {
-                        final val = double.tryParse(v.replaceAll(',', '.'));
-                        if (selectedMatiere != null && val != null) {
-                          setState(() {
-                            prixKg[selectedMatiere!] = val;
-                          });
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.tonal(
-                    onPressed: (selectedMatiere == null)
-                        ? null
-                        : () {
-                            final defaults = {
-                              'Acier': 1.30,
-                              'Aluminium': 5.00,
-                              'Inox': 5.00,
-                              'Fonte': 2.00,
-                            };
-                            if (defaults.containsKey(selectedMatiere)) {
-                              setState(() {
-                                prixKg[selectedMatiere!] = defaults[selectedMatiere]!;
-                              });
-                              controller.text = defaults[selectedMatiere]!.toStringAsFixed(2);
-                            }
-                          },
-                    child: const Text('Par défaut'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: const Icon(Icons.price_change),
-                title: const Text('Récap tarifs'),
-                subtitle: Text(
-                  ['Acier', 'Aluminium', 'Inox', 'Fonte']
-                      .map((k) => '$k: ${prixKg[k]?.toStringAsFixed(2) ?? '—'} €')
-                      .join(' · '),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _pageResultats(BuildContext context) {
-    final pu = poidsUnitaireKgM();
-    final total = poidsTotalKg();
-    final prixKgSel = _prixKgSel();
-    final prixTotal = prixTotalEuro();
-
-    String fmtKg(num v) => v.toStringAsFixed(2);
-    String fmtEur(num v) => '${v.toStringAsFixed(2)} €';
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          SectionCard(
-            title: 'Récapitulatif',
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  Chip(label: Text('Mode: ${mode == Mode.normalise ? 'Normalisé' : 'Libre'}')),
-                  if (mode == Mode.normalise && selectedSerie != null && selectedTaille != null)
-                    Chip(label: Text('${selectedSerie!} ${selectedTaille!}')),
-                  if (mode == Mode.libre && selectedProfilLibre != null) Chip(label: Text(selectedProfilLibre!)),
-                  Chip(label: Text('Matière: ${selectedMatiere ?? '—'}')),
-                  Chip(label: Text('Longueur: ${longueurM.toStringAsFixed(2)} m')),
-                  Chip(label: Text('Quantité: $quantite')),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (pu != null) _HeroTotal(value: '${fmtKg(pu)} kg/m', caption: 'Poids unitaire'),
-              const SizedBox(height: 8),
-              if (total != null) _HeroTotal(value: '${fmtKg(total)} kg', caption: 'Poids total'),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SectionCard(
-            title: 'Prix',
-            children: [
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                const Text('Tarif matière (€/kg)'),
-                Text(prixKgSel != null ? fmtEur(prixKgSel) : '—'),
-              ]),
-              const SizedBox(height: 6),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                const Text('Prix total', style: TextStyle(fontWeight: FontWeight.w700)),
-                Text(prixTotal != null ? fmtEur(prixTotal) : '—',
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-              ]),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: (total ?? 0) <= 0
-                    ? null
-                    : () {
-                        final msg = StringBuffer()
-                          ..writeln('Duduf Occas — Récap')
-                          ..writeln('Matière: ${selectedMatiere ?? '—'}')
-                          ..writeln('Poids unitaire: ${pu != null ? fmtKg(pu) : '—'} kg/m')
-                          ..writeln('Longueur: ${longueurM.toStringAsFixed(2)} m')
-                          ..writeln('Quantité: $quantite')
-                          ..writeln('Poids total: ${total != null ? fmtKg(total) : '—'} kg')
-                          ..writeln('Tarif: ${prixKgSel != null ? fmtEur(prixKgSel!) : '—'} / kg')
-                          ..writeln('Prix total: ${prixTotal != null ? fmtEur(prixTotal!) : '—'}');
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('À partager plus tard:\n${msg.toString()}')),
-                        );
-                      },
-                icon: const Icon(Icons.share),
-                label: const Text('Partager'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ======== BLOCS UI DÉCO/UX ========
   Widget _normaliseCardInner() {
     final series = poidsParMetre.keys.toList()..sort();
     final tailles = (selectedSerie == null)
@@ -501,60 +297,159 @@ class _DudufHomePageState extends State<DudufHomePage> {
       }
     }
 
-    return Column(
-      children: [
-        DropdownButtonFormField<String>(
-          value: selectedSerie,
-          decoration: const InputDecoration(labelText: 'Série'),
-          items: series.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-          onChanged: (v) => setState(() {
-            selectedSerie = v;
-            selectedTaille = null;
-          }),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          value: selectedTaille,
-          decoration: const InputDecoration(labelText: 'Taille (mm)'),
-          items: tailles.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-          onChanged: (v) => setState(() => selectedTaille = v),
-        ),
-        if (base != null && scaled != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('kg/m (acier)'),
-                Text(base.toStringAsFixed(2)),
-              ],
-            ),
-          ),
-        if (scaled != null)
-          Row(
+    return Column(children: [
+      DropdownButtonFormField<String>(
+        value: selectedSerie,
+        decoration: const InputDecoration(labelText: 'Série'),
+        items: series.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+        onChanged: (v) => setState(() { selectedSerie = v; selectedTaille = null; }),
+      ),
+      const SizedBox(height: 8),
+      DropdownButtonFormField<String>(
+        value: selectedTaille,
+        decoration: const InputDecoration(labelText: 'Taille (mm)'),
+        items: tailles.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+        onChanged: (v) => setState(() => selectedTaille = v),
+      ),
+      if (base != null && scaled != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('kg/m (${selectedMatiere ?? 'matière'})'),
-              Text(scaled.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w700)),
+              const Text('kg/m (acier)'),
+              Text(base.toStringAsFixed(2)),
             ],
           ),
-      ],
-    );
+        ),
+      if (scaled != null)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('kg/m (${selectedMatiere ?? 'matière'})'),
+            Text(scaled.toStringAsFixed(2), style: const TextStyle(fontWeight: FontWeight.w700)),
+          ],
+        ),
+    ]);
   }
 
   Widget _libreCardInner() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DropdownButtonFormField<String>(
-          value: selectedProfilLibre,
-          decoration: const InputDecoration(labelText: 'Profil libre'),
-          items: profilsLibres.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
-          onChanged: (v) => setState(() => selectedProfilLibre = v),
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      DropdownButtonFormField<String>(
+        value: selectedProfilLibre,
+        decoration: const InputDecoration(labelText: 'Profil libre'),
+        items: profilsLibres.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+        onChanged: (v) => setState(() => selectedProfilLibre = v),
+      ),
+    ]);
+  }
+
+  Widget _pageMatiere(BuildContext context) {
+    final pKg = _prixKgSel();
+    final controller = TextEditingController(text: pKg != null ? pKg.toStringAsFixed(2) : '');
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(children: [
+        SectionCard(
+          title: 'Matière',
+          children: [
+            DropdownButtonFormField<String>(
+              value: selectedMatiere,
+              decoration: const InputDecoration(labelText: 'Matière'),
+              items: densites.keys.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+              onChanged: (v) => setState(() => selectedMatiere = v),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('Densités (kg/m³)'),
+              subtitle: Text(densites.entries.map((e) => '${e.key}: ${e.value.toStringAsFixed(0)}').join(' · ')),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
-        if (selectedProfilLibre != null) _libreInputs(),
-      ],
+        SectionCard(
+          title: 'Tarif €/kg',
+          children: [
+            Row(children: [
+              Expanded(
+                child: TextFormField(
+                  controller: controller,
+                  decoration: const InputDecoration(labelText: 'Tarif (€/kg)', prefixIcon: Icon(Icons.euro)),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (v) {
+                    final val = double.tryParse(v.replaceAll(',', '.'));
+                    if (selectedMatiere != null && val != null) {
+                      setState(() { prixKg[selectedMatiere!] = val; });
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonal(
+                onPressed: (selectedMatiere == null) ? null : () {
+                  final defaults = {'Acier':1.30,'Aluminium':5.00,'Inox':5.00,'Fonte':2.00};
+                  if (defaults.containsKey(selectedMatiere)) {
+                    setState(() { prixKg[selectedMatiere!] = defaults[selectedMatiere]!; });
+                    controller.text = defaults[selectedMatiere]!.toStringAsFixed(2);
+                  }
+                },
+                child: const Text('Par défaut'),
+              ),
+            ]),
+          ],
+        ),
+      ]),
+    );
+  }
+
+  Widget _pageResultats(BuildContext context) {
+    final pu = poidsUnitaireKgM();
+    final total = poidsTotalKg();
+    final prixKgSel = _prixKgSel();
+    final prixTotal = prixTotalEuro();
+
+    String fmtKg(num v) => v.toStringAsFixed(2);
+    String fmtEur(num v) => '${v.toStringAsFixed(2)} €';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(children: [
+        SectionCard(
+          title: 'Récapitulatif',
+          children: [
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              Chip(label: Text('Mode: ${mode == Mode.normalise ? 'Normalisé' : 'Libre'}')),
+              if (mode == Mode.normalise && selectedSerie != null && selectedTaille != null)
+                Chip(label: Text('${selectedSerie!} ${selectedTaille!}')),
+              if (mode == Mode.libre && selectedProfilLibre != null) Chip(label: Text(selectedProfilLibre!)),
+              Chip(label: Text('Matière: ${selectedMatiere ?? '—'}')),
+              Chip(label: Text('Longueur: ${longueurM.toStringAsFixed(2)} m')),
+              Chip(label: Text('Quantité: $quantite')),
+            ]),
+            const SizedBox(height: 16),
+            if (pu != null) _HeroTotal(value: '${fmtKg(pu)} kg/m', caption: 'Poids unitaire'),
+            const SizedBox(height: 8),
+            if (total != null) _HeroTotal(value: '${fmtKg(total)} kg', caption: 'Poids total'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SectionCard(
+          title: 'Prix',
+          children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              const Text('Tarif matière (€/kg)'),
+              Text(prixKgSel != null ? fmtEur(prixKgSel) : '—'),
+            ]),
+            const SizedBox(height: 6),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              const Text('Prix total', style: TextStyle(fontWeight: FontWeight.w700)),
+              Text(prixTotal != null ? fmtEur(prixTotal) : '—',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+            ]),
+          ],
+        ),
+      ]),
     );
   }
 
@@ -574,33 +469,8 @@ class _DudufHomePageState extends State<DudufHomePage> {
     );
   }
 
-  Widget _numField({required String label, required String initial, required void Function(String) onChanged}) {
-    return SizedBox(
-      width: 220,
-      child: TextFormField(
-        initialValue: initial,
-        decoration: InputDecoration(labelText: label),
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        onChanged: onChanged,
-      ),
-    );
-  }
-
-  Widget _intField({required String label, required String initial, required void Function(String) onChanged}) {
-    return SizedBox(
-      width: 160,
-      child: TextFormField(
-        initialValue: initial,
-        decoration: InputDecoration(labelText: label),
-        keyboardType: TextInputType.number,
-        onChanged: onChanged,
-      ),
-    );
-  }
-
   double _toDouble(String s, double fallback) =>
       double.tryParse(s.replaceAll(',', '.')) ?? fallback;
-  int _toInt(String s, int fallback) => int.tryParse(s) ?? fallback;
 }
 
 // ======== Widgets décoratifs ========
@@ -651,32 +521,20 @@ class _HeroTotal extends StatelessWidget {
   }
 }
 
-// ======== Widgets UX supplémentaires ========
 class SectionCard extends StatelessWidget {
   final String title;
-  final String? subtitle;
   final List<Widget> children;
-  const SectionCard({super.key, required this.title, this.subtitle, required this.children});
-
+  const SectionCard({super.key, required this.title, required this.children});
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Card(
-      surfaceTintColor: cs.primary,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            if (subtitle != null) ...[
-              const SizedBox(height: 4),
-              Text(subtitle!, style: TextStyle(color: Colors.grey[700])),
-            ],
-            const SizedBox(height: 12),
-            ...children,
-          ],
-        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          ...children,
+        ]),
       ),
     );
   }
@@ -688,28 +546,19 @@ class QuantityStepper extends StatelessWidget {
   const QuantityStepper({super.key, required this.value, required this.onChanged});
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton.outlined(
-          onPressed: () => onChanged(value > 1 ? value - 1 : 1),
-          icon: const Icon(Icons.remove),
+    return Row(children: [
+      IconButton.outlined(onPressed: () => onChanged(value > 1 ? value - 1 : 1), icon: const Icon(Icons.remove)),
+      SizedBox(
+        width: 80,
+        child: TextFormField(
+          textAlign: TextAlign.center,
+          initialValue: value.toString(),
+          keyboardType: TextInputType.number,
+          onChanged: (v) => onChanged(int.tryParse(v) ?? value),
         ),
-        SizedBox(
-          width: 80,
-          child: TextFormField(
-            textAlign: TextAlign.center,
-            initialValue: value.toString(),
-            keyboardType: TextInputType.number,
-            onChanged: (v) => onChanged(int.tryParse(v) ?? value),
-          ),
-        ),
-        IconButton.filled(
-          onPressed: () => onChanged(value + 1),
-          icon: const Icon(Icons.add),
-        ),
-      ],
-    );
+      ),
+      IconButton.filled(onPressed: () => onChanged(value + 1), icon: const Icon(Icons.add)),
+    ]);
   }
 }
 
@@ -719,14 +568,7 @@ class LabeledNumberField extends StatelessWidget {
   final double value;
   final IconData? icon;
   final void Function(double) onChanged;
-  const LabeledNumberField({
-    super.key,
-    required this.label,
-    required this.unit,
-    required this.value,
-    required this.onChanged,
-    this.icon,
-  });
+  const LabeledNumberField({super.key, required this.label, required this.unit, required this.value, required this.onChanged, this.icon});
 
   @override
   Widget build(BuildContext context) {
