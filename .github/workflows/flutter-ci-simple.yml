@@ -1,33 +1,7 @@
-name: Flutter CI (Debug APK)
-
-on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.35.0'
-          channel: stable
-          cache: true
-
-      - run: flutter pub get
-      - run: flutter build apk --debug
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+- name: Scaffold Android (CI fallback)
+  run: |
+    if [ ! -d "android" ]; then
+      flutter create scaffold --platforms=android -t app
+      rm -rf android
+      mv scaffold/android android
+    fi
