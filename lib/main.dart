@@ -357,7 +357,7 @@ class _DudufHomePageState extends State<DudufHomePage> {
     final prixTotal = prixTotalEuro();
 
     String fmtKg(num v) => v.toStringAsFixed(2);
-    String fmt€(num v) => '${v.toStringAsFixed(2)} €';
+    String fmtEur(num v) => '${v.toStringAsFixed(2)} €';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -398,7 +398,7 @@ class _DudufHomePageState extends State<DudufHomePage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Tarif matière (€/kg)'),
-                          Text(prixKgSel != null ? fmt€(prixKgSel) : '—'),
+                          Text(prixKgSel != null ? fmtEur(prixKgSel) : '—'),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -407,7 +407,7 @@ class _DudufHomePageState extends State<DudufHomePage> {
                         children: [
                           const Text('Prix total'),
                           Text(
-                            prixTotal != null ? fmt€(prixTotal) : '—',
+                            prixTotal != null ? fmtEur(prixTotal) : '—',
                             style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ],
@@ -429,8 +429,8 @@ class _DudufHomePageState extends State<DudufHomePage> {
                           ..writeln('Longueur: ${longueurM.toStringAsFixed(2)} m')
                           ..writeln('Quantité: $quantite')
                           ..writeln('Poids total: ${total != null ? fmtKg(total) : '—'} kg')
-                          ..writeln('Tarif: ${prixKgSel != null ? fmt€(prixKgSel!) : '—'} / kg')
-                          ..writeln('Prix total: ${prixTotal != null ? fmt€(prixTotal!) : '—'}');
+                          ..writeln('Tarif: ${prixKgSel != null ? fmtEur(prixKgSel!) : '—'} / kg')
+                          ..writeln('Prix total: ${prixTotal != null ? fmtEur(prixTotal!) : '—'}');
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('À partager plus tard:\n${msg.toString()}')),
                         );
