@@ -56,7 +56,7 @@ class DudufOccasApp extends StatelessWidget {
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           labelStyle: TextStyle(color: Colors.white.withOpacity(0.9)),
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: steel.withOpacity(0.8),
           elevation: 0,
           shape: RoundedRectangleBorder(
