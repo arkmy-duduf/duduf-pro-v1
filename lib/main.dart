@@ -8,36 +8,94 @@ class DudufOccasApp extends StatelessWidget {
   const DudufOccasApp({super.key});
   @override
   Widget build(BuildContext context) {
+    // Palette “métal industriel”
+    const steel = Color(0xFF2B2F36); // gris anthracite
+    const steelDark = Color(0xFF1F2329);
+    const steelLight = Color(0xFF3A3F47);
+    const accent = Color(0xFFFF8C1A); // orange chaud “atelier”
+
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: accent,
+      brightness: Brightness.dark,
+      primary: accent,
+      onPrimary: Colors.black,
+      surface: steel,
+      onSurface: Colors.white,
+      secondary: steelLight,
+    );
+
     return MaterialApp(
       title: 'Duduf Occas',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2563EB),
-          brightness: Brightness.light,
-        ),
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(centerTitle: true),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          filled: true,
-          fillColor: Color(0xFFF7F8FA),
-          contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        brightness: Brightness.dark,
+        colorScheme: colorScheme,
+        scaffoldBackgroundColor: steelDark,
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
         ),
-        cardTheme: const CardThemeData(
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+            borderRadius: const BorderRadius.all(Radius.circular(12)),
+          ),
+          focusedBorder: const OutlineInputBorder(
+            borderSide: BorderSide(color: accent, width: 1.5),
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+          ),
+          filled: true,
+          fillColor: steel.withOpacity(0.6),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          labelStyle: TextStyle(color: Colors.white.withOpacity(0.9)),
+        ),
+        cardTheme: CardTheme(
+          color: steel.withOpacity(0.8),
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(16)),
+            borderRadius: const BorderRadius.all(Radius.circular(16)),
+            side: BorderSide(color: Colors.white.withOpacity(0.08)),
           ),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: ButtonStyle(
+            backgroundColor: const WidgetStatePropertyAll(accent),
+            foregroundColor: const WidgetStatePropertyAll(Colors.black),
             shape: WidgetStatePropertyAll(
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             padding: const WidgetStatePropertyAll(
               EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
+          ),
+        ),
+        iconButtonTheme: IconButtonThemeData(
+          style: ButtonStyle(
+            backgroundColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.pressed)) {
+                return accent.withOpacity(0.2);
+              }
+              return Colors.white.withOpacity(0.06);
+            }),
+            foregroundColor: const WidgetStatePropertyAll(Colors.white),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          height: 70,
+          backgroundColor: steel,
+          indicatorColor: accent.withOpacity(0.15),
+          labelTextStyle: const WidgetStatePropertyAll(
+            TextStyle(fontWeight: FontWeight.w600),
           ),
         ),
       ),
@@ -84,8 +142,9 @@ class _DudufHomePageState extends State<DudufHomePage> {
   final _aile2Ctrl = TextEditingController(text: '40');
 
   // Filtre simple pour chiffres + , .
-  final List<TextInputFormatter> _numFormatters =
-      [FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]'))];
+  final List<TextInputFormatter> _numFormatters = [
+    FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]')),
+  ];
 
   // Tables normalisées (kg/m acier ≈ EN 10365 usuelles)
   final Map<String, Map<String, double>> poidsParMetre = {
@@ -125,34 +184,19 @@ class _DudufHomePageState extends State<DudufHomePage> {
 
   // Profils libres disponibles
   final List<String> profilsLibres = [
-    'Tube rond',
-    'Tube carré',
-    'Tube rectangulaire',
-    'Carré plein',
-    'Rectangle plein',
-    'Rond plein',
-    'Cornière égale',
-    'Cornière inégale',
-    'T',
-    'Plat',
+    'Tube rond', 'Tube carré', 'Tube rectangulaire',
+    'Carré plein', 'Rectangle plein', 'Rond plein',
+    'Cornière égale', 'Cornière inégale', 'T', 'Plat',
   ];
 
   // Densités kg/m3
   final Map<String, double> densites = {
-    'Acier': 7850,
-    'Inox': 8000,
-    'Aluminium': 2700,
-    'Fonte': 7200,
-    'Cuivre': 8960,
-    'Laiton': 8500,
+    'Acier': 7850, 'Inox': 8000, 'Aluminium': 2700, 'Fonte': 7200, 'Cuivre': 8960, 'Laiton': 8500,
   };
 
   // Prix €/kg (éditables)
   final Map<String, double> prixKg = {
-    'Acier': 1.30,
-    'Aluminium': 5.00,
-    'Inox': 5.00,
-    'Fonte': 2.00,
+    'Acier': 1.30, 'Aluminium': 5.00, 'Inox': 5.00, 'Fonte': 2.00,
   };
 
   @override
@@ -272,17 +316,38 @@ class _DudufHomePageState extends State<DudufHomePage> {
       _pageMatiere(context),
       _pageResultats(context),
     ];
-    return Scaffold(
-      appBar: AppBar(title: const Text('Duduf Occas')),
-      body: IndexedStack(index: _navIndex, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _navIndex,
-        onDestinationSelected: (i) => setState(() => _navIndex = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.straighten), label: 'Calcul'),
-          NavigationDestination(icon: Icon(Icons.category), label: 'Matière'),
-          NavigationDestination(icon: Icon(Icons.summarize), label: 'Résultats'),
-        ],
+    return Container(
+      // Fond acier “brossé” simple (dégradé)
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF1A1D22), Color(0xFF0F1114)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          toolbarHeight: 68,
+          title: Image.asset(
+            'assets/logo.png',
+            height: 34,
+            fit: BoxFit.contain,
+          ),
+          centerTitle: true,
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+        ),
+        body: IndexedStack(index: _navIndex, children: pages),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _navIndex,
+          onDestinationSelected: (i) => setState(() => _navIndex = i),
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.straighten), label: 'Calcul'),
+            NavigationDestination(icon: Icon(Icons.category), label: 'Matière'),
+            NavigationDestination(icon: Icon(Icons.summarize), label: 'Résultats'),
+          ],
+        ),
       ),
     );
   }
@@ -674,13 +739,17 @@ class _ResultBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(children: [
-        Icon(icon, size: 28, color: cs.onPrimaryContainer),
+        Icon(icon, size: 28, color: cs.primary),
         const SizedBox(width: 12),
-        Expanded(child: Text(title, style: TextStyle(color: cs.onPrimaryContainer))),
-        Text(value, style: TextStyle(fontWeight: FontWeight.w700, color: cs.onPrimaryContainer)),
+        Expanded(child: Text(title)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
       ]),
     );
   }
@@ -697,14 +766,14 @@ class _HeroTotal extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [cs.primary, cs.secondary]),
+        gradient: LinearGradient(colors: [cs.primary, cs.primary.withOpacity(0.6)]),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         children: [
-          Text(value, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
+          Text(value, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black)),
           const SizedBox(height: 6),
-          Text(caption, style: const TextStyle(color: Colors.white70)),
+          Text(caption, style: const TextStyle(color: Colors.black87)),
         ],
       ),
     );
