@@ -1,22 +1,32 @@
 name: duduf_occas
-description: Calculateur de poids de ferraille (Duduf Ocas)
-publish_to: 'none'
+description: Calcul poids & prix profils acier (Duduf Occas)
+publish_to: "none"
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.4.0 <4.0.0'
+  sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
+  # (rien d'autre n'est requis pour l'instant)
+  cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   assets:
-    # plus tard tu pourras ajouter un logo/icône ici
-    # - assets/logo.png
+    - assets/logo.png
+
+# Génération des icônes Android depuis assets/logo.png
+flutter_icons:
+  android: true
+  ios: false
+  image_path: assets/logo.png
+  adaptive_icon_background: "#1F2329"   # fond anthracite
+  adaptive_icon_foreground: assets/logo.png
