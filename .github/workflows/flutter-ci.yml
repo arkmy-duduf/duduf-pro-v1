@@ -22,22 +22,38 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.35.0"   # pin => pas de "channel: stable"
+          flutter-version: "3.35.0"
 
-      - name: Flutter pub get (with cache)
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-            .dart_tool
-          key: ${{ runner.os }}-pub-${{ hashFiles('pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
-      - run: flutter pub get
+      # 1) S'assurer que le squelette Android existe
+      - name: Ensure Android scaffold exists
+        run: |
+          if [ ! -f android/app/src/main/AndroidManifest.xml ]; then
+            echo "No Android project detected -> flutter create"
+            flutter create . --platforms=android -t app --project-name duduf_occas
+          else
+            echo "Android project already present."
+          fi
 
+      - name: Flutter pub get
+        run: flutter pub get
+
+      # 2) Définir le nom de l’app "Duduf Occas"
+      - name: Set Android app label and strings.xml
+        run: |
+          mkdir -p android/app/src/main/res/values
+          cat > android/app/src/main/res/values/strings.xml <<'EOF'
+          <resources>
+              <string name="app_name">Duduf Occas</string>
+          </resources>
+          EOF
+          # Remplace le label de l'application par @string/app_name
+          sed -i 's/android:label="[^"]*"/android:label="@string\/app_name"/' android/app/src/main/AndroidManifest.xml || true
+
+      # 3) Générer les icônes (depuis assets/logo.png)
       - name: Generate launcher icons
         run: flutter pub run flutter_launcher_icons:main
 
+      # 4) Build APK
       - name: Build debug APK
         run: flutter build apk --debug
 
