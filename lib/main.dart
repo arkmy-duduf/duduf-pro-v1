@@ -196,15 +196,18 @@ class _DudufHomePageState extends State<DudufHomePage> {
     final dInt = (D - 2 * t).clamp(0, double.infinity);
     return math.pi * (math.pow(D, 2) - math.pow(dInt, 2)) / 4.0;
   }
+
   double _aireTubeCarre(double a, double t) {
     final ai = (a - 2 * t).clamp(0, double.infinity);
     return a * a - ai * ai;
   }
+
   double _aireTubeRect(double a, double b, double t) {
     final ai = (a - 2 * t).clamp(0, double.infinity);
     final bi = (b - 2 * t).clamp(0, double.infinity);
     return a * b - ai * bi;
   }
+
   double _aireCorniereEgale(double a, double t) => (2 * a - t).clamp(0, double.infinity) * t;
   double _aireCorniereInegale(double a1, double a2, double t) => (a1 + a2 - t).clamp(0, double.infinity) * t;
   double _aireTe(double aile, double h, double t) => (aile * t + (h - t).clamp(0, double.infinity) * t);
@@ -342,6 +345,66 @@ class _DudufHomePageState extends State<DudufHomePage> {
         onChanged: (v) => setState(() => selectedProfilLibre = v),
       ),
     ]);
+  }
+
+  /// 🔧 Manquant précédemment — maintenant présent :
+  Widget _libreInputs() {
+    if (selectedProfilLibre == null) return const SizedBox.shrink();
+    switch (selectedProfilLibre) {
+      case 'Tube rond':
+        return _wrapFields([
+          _mmField('Ø extérieur (mm)', dExt, (v) => dExt = v),
+          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+        ]);
+      case 'Tube carré':
+        return _wrapFields([
+          _mmField('Côté (mm)', cote, (v) => cote = v),
+          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+        ]);
+      case 'Tube rectangulaire':
+        return _wrapFields([
+          _mmField('Largeur (mm)', larg, (v) => larg = v),
+          _mmField('Hauteur (mm)', haut, (v) => haut = v),
+          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+        ]);
+      case 'Carré plein':
+        return _wrapFields([
+          _mmField('Côté (mm)', cote, (v) => cote = v),
+        ]);
+      case 'Rectangle plein':
+        return _wrapFields([
+          _mmField('Largeur (mm)', larg, (v) => larg = v),
+          _mmField('Hauteur (mm)', haut, (v) => haut = v),
+        ]);
+      case 'Rond plein':
+        return _wrapFields([
+          _mmField('Ø (mm)', dPlein, (v) => dPlein = v),
+        ]);
+      case 'Cornière égale':
+        return _wrapFields([
+          _mmField('Aile (mm)', aile, (v) => aile = v),
+          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+        ]);
+      case 'Cornière inégale':
+        return _wrapFields([
+          _mmField('Aile 1 (mm)', aile, (v) => aile = v),
+          _mmField('Aile 2 (mm)', aile2, (v) => aile2 = v),
+          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+        ]);
+      case 'T':
+        return _wrapFields([
+          _mmField('Largeur aile (mm)', aile, (v) => aile = v),
+          _mmField('Hauteur (mm)', haut, (v) => haut = v),
+          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+        ]);
+      case 'Plat':
+        return _wrapFields([
+          _mmField('Largeur (mm)', larg, (v) => larg = v),
+          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+        ]);
+      default:
+        return const SizedBox.shrink();
+    }
   }
 
   Widget _pageMatiere(BuildContext context) {
