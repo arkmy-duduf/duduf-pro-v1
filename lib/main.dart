@@ -328,10 +328,10 @@ class _DudufHomePageState extends State<DudufHomePage> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          toolbarHeight: 68,
+          toolbarHeight: 84,
           title: Image.asset(
             'assets/logo.png',
-            height: 34,
+            height: 64,
             fit: BoxFit.contain,
           ),
           centerTitle: true,
