@@ -55,6 +55,15 @@ class _DudufHomePageState extends State<DudufHomePage> {
     'Laiton': 8500,
   };
 
+  // Prix €/kg (modifiable)
+  final Map<String, double> prixKg = {
+    'Acier': 1.30,
+    'Aluminium': 5.00,
+    'Inox': 5.00,
+    'Fonte': 2.00,
+    // Cuivre/Laiton non définis par défaut
+  };
+
   // Longueur & quantité (communs)
   double longueurM = 1.0;
   int quantite = 1;
@@ -110,6 +119,7 @@ class _DudufHomePageState extends State<DudufHomePage> {
 
   // ======== CALCULS ========
   double? _densiteSel() => densites[selectedMatiere];
+  double? _prixKgSel() => selectedMatiere == null ? null : prixKg[selectedMatiere!];
 
   double? poidsUnitaireKgM() {
     final densite = _densiteSel();
@@ -147,11 +157,17 @@ class _DudufHomePageState extends State<DudufHomePage> {
     return pu * longueurM * quantite;
   }
 
+  double? prixTotalEuro() {
+    final tot = poidsTotalKg();
+    final pKg = _prixKgSel();
+    if (tot == null || pKg == null) return null;
+    return tot * pKg;
+  }
+
   // Aires (mm²) sécurisées (clamp)
   double _aireTubeRond(double D, double t) {
     final dInt = (D - 2 * t).clamp(0, double.infinity);
     return math.pi * (math.pow(D, 2) - math.pow(dInt, 2)) / 4.0;
-    // Option coins arrondis ignorée pour simplicité (écart faible)
   }
 
   double _aireTubeCarre(double a, double t) {
@@ -249,12 +265,17 @@ class _DudufHomePageState extends State<DudufHomePage> {
   }
 
   Widget _pageMatiere(BuildContext context) {
+    final pKg = _prixKgSel();
+    final controller = TextEditingController(
+      text: pKg != null ? pKg.toStringAsFixed(2) : '',
+    );
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(children: [
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             DropdownButtonFormField<String>(
               value: selectedMatiere,
               decoration: const InputDecoration(labelText: 'Matière'),
@@ -262,10 +283,66 @@ class _DudufHomePageState extends State<DudufHomePage> {
               onChanged: (v) => setState(() => selectedMatiere = v),
             ),
             const SizedBox(height: 12),
+            // Densités
             ListTile(
               leading: const Icon(Icons.info_outline),
               title: const Text('Densités (kg/m³)'),
               subtitle: Text(densites.entries.map((e) => '${e.key}: ${e.value.toStringAsFixed(0)}').join(' · ')),
+            ),
+            const SizedBox(height: 12),
+            // Tarif €/kg editable pour la matière sélectionnée
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: controller,
+                    decoration: InputDecoration(
+                      labelText: 'Tarif ${selectedMatiere ?? ''} (€/kg)',
+                      helperText: 'Modifie le prix pour la matière sélectionnée',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (v) {
+                      final val = double.tryParse(v.replaceAll(',', '.'));
+                      if (selectedMatiere != null && val != null) {
+                        setState(() {
+                          prixKg[selectedMatiere!] = val;
+                        });
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: (selectedMatiere == null)
+                      ? null
+                      : () {
+                          // valeurs par défaut demandées
+                          final defaults = {
+                            'Acier': 1.30,
+                            'Aluminium': 5.00,
+                            'Inox': 5.00,
+                            'Fonte': 2.00,
+                          };
+                          if (defaults.containsKey(selectedMatiere)) {
+                            setState(() {
+                              prixKg[selectedMatiere!] = defaults[selectedMatiere]!;
+                            });
+                          }
+                        },
+                  child: const Text('Par défaut'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Rappel tarifs clés
+            ListTile(
+              leading: const Icon(Icons.euro),
+              title: const Text('Tarifs (€/kg)'),
+              subtitle: Text(
+                ['Acier', 'Aluminium', 'Inox', 'Fonte']
+                    .map((k) => '$k: ${prixKg[k]?.toStringAsFixed(2) ?? '—'} €')
+                    .join(' · '),
+              ),
             ),
           ]),
         ),
@@ -276,6 +353,12 @@ class _DudufHomePageState extends State<DudufHomePage> {
   Widget _pageResultats(BuildContext context) {
     final pu = poidsUnitaireKgM();
     final total = poidsTotalKg();
+    final prixKgSel = _prixKgSel();
+    final prixTotal = prixTotalEuro();
+
+    String fmtKg(num v) => v.toStringAsFixed(2);
+    String fmt€(num v) => '${v.toStringAsFixed(2)} €';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(children: [
@@ -295,16 +378,61 @@ class _DudufHomePageState extends State<DudufHomePage> {
                 Chip(label: Text('Quantité: $quantite')),
               ]),
               const SizedBox(height: 16),
-              if (pu != null) _HeroTotal(value: '${pu.toStringAsFixed(2)} kg/m', caption: 'Poids unitaire'),
+
+              if (pu != null) _HeroTotal(value: '${fmtKg(pu)} kg/m', caption: 'Poids unitaire'),
               const SizedBox(height: 8),
-              if (total != null) _HeroTotal(value: '${total.toStringAsFixed(2)} kg', caption: 'Poids total'),
+              if (total != null) _HeroTotal(value: '${fmtKg(total)} kg', caption: 'Poids total'),
+
+              const SizedBox(height: 12),
+              // Prix
+              Card(
+                color: Theme.of(context).colorScheme.surfaceVariant,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Prix', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Tarif matière (€/kg)'),
+                          Text(prixKgSel != null ? fmt€(prixKgSel) : '—'),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Prix total'),
+                          Text(
+                            prixTotal != null ? fmt€(prixTotal) : '—',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 12),
               FilledButton.icon(
                 onPressed: (total ?? 0) <= 0
                     ? null
                     : () {
+                        final msg = StringBuffer()
+                          ..writeln('Duduf Occas — Récap')
+                          ..writeln('Matière: ${selectedMatiere ?? '—'}')
+                          ..writeln('Poids unitaire: ${pu != null ? fmtKg(pu) : '—'} kg/m')
+                          ..writeln('Longueur: ${longueurM.toStringAsFixed(2)} m')
+                          ..writeln('Quantité: $quantite')
+                          ..writeln('Poids total: ${total != null ? fmtKg(total) : '—'} kg')
+                          ..writeln('Tarif: ${prixKgSel != null ? fmt€(prixKgSel!) : '—'} / kg')
+                          ..writeln('Prix total: ${prixTotal != null ? fmt€(prixTotal!) : '—'}');
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Total copié: ${total!.toStringAsFixed(2)} kg (à venir)')),
+                          SnackBar(content: Text('À partager plus tard:\n${msg.toString()}')),
                         );
                       },
                 icon: const Icon(Icons.share),
