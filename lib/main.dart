@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 void main() => runApp(const DudufOccasApp());
 
@@ -16,13 +17,7 @@ class DudufOccasApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
-        visualDensity: VisualDensity.standard,
         appBarTheme: const AppBarTheme(centerTitle: true),
-        navigationBarTheme: const NavigationBarThemeData(
-          height: 70,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          indicatorShape: StadiumBorder(),
-        ),
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(),
           filled: true,
@@ -69,12 +64,28 @@ class _DudufHomePageState extends State<DudufHomePage> {
   String? selectedProfilLibre;
   String? selectedMatiere = 'Acier';
 
-  // Dimensions (mm)
+  // Valeurs numériques (stock)
   double dExt = 100, ep = 5, cote = 100, larg = 100, haut = 50, dPlein = 30, aile = 50, aile2 = 40;
-
-  // Longueur & quantité
   double longueurM = 1.0;
   int quantite = 1;
+
+  // Controllers (champs libres + sélection auto)
+  final _lenCtrl = TextEditingController(text: '1');
+  final _qtyCtrl = TextEditingController(text: '1');
+  final _prixCtrl = TextEditingController();
+
+  final _dExtCtrl = TextEditingController(text: '100');
+  final _epCtrl = TextEditingController(text: '5');
+  final _coteCtrl = TextEditingController(text: '100');
+  final _largCtrl = TextEditingController(text: '100');
+  final _hautCtrl = TextEditingController(text: '50');
+  final _dPleinCtrl = TextEditingController(text: '30');
+  final _aileCtrl = TextEditingController(text: '50');
+  final _aile2Ctrl = TextEditingController(text: '40');
+
+  // Filtre simple pour chiffres + , .
+  final List<TextInputFormatter> _numFormatters =
+      [FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]'))];
 
   // Tables normalisées (kg/m acier ≈ EN 10365 usuelles)
   final Map<String, Map<String, double>> poidsParMetre = {
@@ -144,6 +155,50 @@ class _DudufHomePageState extends State<DudufHomePage> {
     'Fonte': 2.00,
   };
 
+  @override
+  void initState() {
+    super.initState();
+    // Longueur
+    _lenCtrl.addListener(() {
+      final v = _parseD(_lenCtrl.text, longueurM);
+      if (v != longueurM) setState(() => longueurM = v);
+    });
+    // Quantité
+    _qtyCtrl.addListener(() {
+      final iv = int.tryParse(_qtyCtrl.text.replaceAll(RegExp(r'[^0-9]'), ''));
+      if (iv != null && iv > 0 && iv != quantite) setState(() => quantite = iv);
+    });
+
+    // Profils libres
+    _bind(_dExtCtrl, (v) => dExt = v, dExt);
+    _bind(_epCtrl, (v) => ep = v, ep);
+    _bind(_coteCtrl, (v) => cote = v, cote);
+    _bind(_largCtrl, (v) => larg = v, larg);
+    _bind(_hautCtrl, (v) => haut = v, haut);
+    _bind(_dPleinCtrl, (v) => dPlein = v, dPlein);
+    _bind(_aileCtrl, (v) => aile = v, aile);
+    _bind(_aile2Ctrl, (v) => aile2 = v, aile2);
+
+    // Tarif (€/kg)
+    _syncPrixCtrlWithMatiere();
+    _prixCtrl.addListener(() {
+      final v = _parseD(_prixCtrl.text, prixKg[selectedMatiere] ?? 0);
+      if (selectedMatiere != null) {
+        setState(() {
+          prixKg[selectedMatiere!] = v;
+        });
+      }
+    });
+  }
+
+  void _bind(TextEditingController c, void Function(double) setVal, double initial) {
+    c.addListener(() {
+      final v = _parseD(c.text, initial);
+      if (!mounted) return;
+      setState(() => setVal(v));
+    });
+  }
+
   // ======== CALCULS ========
   double? _densiteSel() => selectedMatiere == null ? null : densites[selectedMatiere!];
   double? _prixKgSel() => selectedMatiere == null ? null : prixKg[selectedMatiere!];
@@ -196,18 +251,15 @@ class _DudufHomePageState extends State<DudufHomePage> {
     final dInt = (D - 2 * t).clamp(0, double.infinity);
     return math.pi * (math.pow(D, 2) - math.pow(dInt, 2)) / 4.0;
   }
-
   double _aireTubeCarre(double a, double t) {
     final ai = (a - 2 * t).clamp(0, double.infinity);
     return a * a - ai * ai;
   }
-
   double _aireTubeRect(double a, double b, double t) {
     final ai = (a - 2 * t).clamp(0, double.infinity);
     final bi = (b - 2 * t).clamp(0, double.infinity);
     return a * b - ai * bi;
   }
-
   double _aireCorniereEgale(double a, double t) => (2 * a - t).clamp(0, double.infinity) * t;
   double _aireCorniereInegale(double a1, double a2, double t) => (a1 + a2 - t).clamp(0, double.infinity) * t;
   double _aireTe(double aile, double h, double t) => (aile * t + (h - t).clamp(0, double.infinity) * t);
@@ -215,16 +267,14 @@ class _DudufHomePageState extends State<DudufHomePage> {
   // ======== UI ========
   @override
   Widget build(BuildContext context) {
+    final pages = <Widget>[
+      _pageCalcul(context),
+      _pageMatiere(context),
+      _pageResultats(context),
+    ];
     return Scaffold(
       appBar: AppBar(title: const Text('Duduf Occas')),
-      body: IndexedStack(
-        index: _navIndex,
-        children: [
-          _pageCalcul(context),
-          _pageMatiere(context),
-          _pageResultats(context),
-        ],
-      ),
+      body: IndexedStack(index: _navIndex, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _navIndex,
         onDestinationSelected: (i) => setState(() => _navIndex = i),
@@ -269,12 +319,9 @@ class _DudufHomePageState extends State<DudufHomePage> {
         SectionCard(
           title: 'Longueur & quantité',
           children: [
-            Wrap(spacing: 12, runSpacing: 12, children: [
-              LabeledNumberField(
-                label: 'Longueur', unit: 'm', value: longueurM, icon: Icons.straighten,
-                onChanged: (v) => setState(() => longueurM = v.clamp(0.01, 9999)),
-              ),
-              QuantityStepper(value: quantite, onChanged: (v) => setState(() => quantite = v.clamp(1, 9999))),
+            Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              _freeNumField(label: 'Longueur', unit: 'm', controller: _lenCtrl),
+              _quantityField(),
             ]),
           ],
         ),
@@ -347,60 +394,59 @@ class _DudufHomePageState extends State<DudufHomePage> {
     ]);
   }
 
-  /// 🔧 Manquant précédemment — maintenant présent :
   Widget _libreInputs() {
     if (selectedProfilLibre == null) return const SizedBox.shrink();
     switch (selectedProfilLibre) {
       case 'Tube rond':
         return _wrapFields([
-          _mmField('Ø extérieur (mm)', dExt, (v) => dExt = v),
-          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+          _freeNumField(label: 'Ø extérieur', unit: 'mm', controller: _dExtCtrl),
+          _freeNumField(label: 'Épaisseur', unit: 'mm', controller: _epCtrl),
         ]);
       case 'Tube carré':
         return _wrapFields([
-          _mmField('Côté (mm)', cote, (v) => cote = v),
-          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+          _freeNumField(label: 'Côté', unit: 'mm', controller: _coteCtrl),
+          _freeNumField(label: 'Épaisseur', unit: 'mm', controller: _epCtrl),
         ]);
       case 'Tube rectangulaire':
         return _wrapFields([
-          _mmField('Largeur (mm)', larg, (v) => larg = v),
-          _mmField('Hauteur (mm)', haut, (v) => haut = v),
-          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+          _freeNumField(label: 'Largeur', unit: 'mm', controller: _largCtrl),
+          _freeNumField(label: 'Hauteur', unit: 'mm', controller: _hautCtrl),
+          _freeNumField(label: 'Épaisseur', unit: 'mm', controller: _epCtrl),
         ]);
       case 'Carré plein':
         return _wrapFields([
-          _mmField('Côté (mm)', cote, (v) => cote = v),
+          _freeNumField(label: 'Côté', unit: 'mm', controller: _coteCtrl),
         ]);
       case 'Rectangle plein':
         return _wrapFields([
-          _mmField('Largeur (mm)', larg, (v) => larg = v),
-          _mmField('Hauteur (mm)', haut, (v) => haut = v),
+          _freeNumField(label: 'Largeur', unit: 'mm', controller: _largCtrl),
+          _freeNumField(label: 'Hauteur', unit: 'mm', controller: _hautCtrl),
         ]);
       case 'Rond plein':
         return _wrapFields([
-          _mmField('Ø (mm)', dPlein, (v) => dPlein = v),
+          _freeNumField(label: 'Ø', unit: 'mm', controller: _dPleinCtrl),
         ]);
       case 'Cornière égale':
         return _wrapFields([
-          _mmField('Aile (mm)', aile, (v) => aile = v),
-          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+          _freeNumField(label: 'Aile', unit: 'mm', controller: _aileCtrl),
+          _freeNumField(label: 'Épaisseur', unit: 'mm', controller: _epCtrl),
         ]);
       case 'Cornière inégale':
         return _wrapFields([
-          _mmField('Aile 1 (mm)', aile, (v) => aile = v),
-          _mmField('Aile 2 (mm)', aile2, (v) => aile2 = v),
-          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+          _freeNumField(label: 'Aile 1', unit: 'mm', controller: _aileCtrl),
+          _freeNumField(label: 'Aile 2', unit: 'mm', controller: _aile2Ctrl),
+          _freeNumField(label: 'Épaisseur', unit: 'mm', controller: _epCtrl),
         ]);
       case 'T':
         return _wrapFields([
-          _mmField('Largeur aile (mm)', aile, (v) => aile = v),
-          _mmField('Hauteur (mm)', haut, (v) => haut = v),
-          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+          _freeNumField(label: 'Largeur aile', unit: 'mm', controller: _aileCtrl),
+          _freeNumField(label: 'Hauteur', unit: 'mm', controller: _hautCtrl),
+          _freeNumField(label: 'Épaisseur', unit: 'mm', controller: _epCtrl),
         ]);
       case 'Plat':
         return _wrapFields([
-          _mmField('Largeur (mm)', larg, (v) => larg = v),
-          _mmField('Épaisseur (mm)', ep, (v) => ep = v),
+          _freeNumField(label: 'Largeur', unit: 'mm', controller: _largCtrl),
+          _freeNumField(label: 'Épaisseur', unit: 'mm', controller: _epCtrl),
         ]);
       default:
         return const SizedBox.shrink();
@@ -408,8 +454,6 @@ class _DudufHomePageState extends State<DudufHomePage> {
   }
 
   Widget _pageMatiere(BuildContext context) {
-    final pKg = _prixKgSel();
-    final controller = TextEditingController(text: pKg != null ? pKg.toStringAsFixed(2) : '');
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(children: [
@@ -420,7 +464,10 @@ class _DudufHomePageState extends State<DudufHomePage> {
               value: selectedMatiere,
               decoration: const InputDecoration(labelText: 'Matière'),
               items: densites.keys.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-              onChanged: (v) => setState(() => selectedMatiere = v),
+              onChanged: (v) => setState(() {
+                selectedMatiere = v;
+                _syncPrixCtrlWithMatiere();
+              }),
             ),
             const SizedBox(height: 12),
             ListTile(
@@ -437,26 +484,27 @@ class _DudufHomePageState extends State<DudufHomePage> {
             Row(children: [
               Expanded(
                 child: TextFormField(
-                  controller: controller,
+                  controller: _prixCtrl,
+                  inputFormatters: _numFormatters,
                   decoration: const InputDecoration(labelText: 'Tarif (€/kg)', prefixIcon: Icon(Icons.euro)),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (v) {
-                    final val = double.tryParse(v.replaceAll(',', '.'));
-                    if (selectedMatiere != null && val != null) {
-                      setState(() { prixKg[selectedMatiere!] = val; });
-                    }
-                  },
+                  onTap: () => _selectAll(_prixCtrl),
                 ),
               ),
               const SizedBox(width: 8),
               FilledButton.tonal(
-                onPressed: (selectedMatiere == null) ? null : () {
-                  final defaults = {'Acier':1.30,'Aluminium':5.00,'Inox':5.00,'Fonte':2.00};
-                  if (defaults.containsKey(selectedMatiere)) {
-                    setState(() { prixKg[selectedMatiere!] = defaults[selectedMatiere]!; });
-                    controller.text = defaults[selectedMatiere]!.toStringAsFixed(2);
-                  }
-                },
+                onPressed: (selectedMatiere == null)
+                    ? null
+                    : () {
+                        const defaults = {'Acier': 1.30, 'Aluminium': 5.00, 'Inox': 5.00, 'Fonte': 2.00};
+                        final def = defaults[selectedMatiere];
+                        if (def != null) {
+                          setState(() {
+                            prixKg[selectedMatiere!] = def;
+                            _prixCtrl.text = def.toString();
+                          });
+                        }
+                      },
                 child: const Text('Par défaut'),
               ),
             ]),
@@ -516,24 +564,103 @@ class _DudufHomePageState extends State<DudufHomePage> {
     );
   }
 
-  // ======== Helpers UI ========
+  // ======== Helpers ========
   Widget _wrapFields(List<Widget> children) =>
       Wrap(spacing: 12, runSpacing: 12, children: children);
 
-  Widget _mmField(String label, double value, void Function(double) onChanged) {
+  // Champ numérique “libre” avec sélection auto au focus
+  Widget _freeNumField({
+    required String label,
+    required String unit,
+    required TextEditingController controller,
+  }) {
     return SizedBox(
       width: 220,
       child: TextFormField(
-        initialValue: value.toStringAsFixed(1),
-        decoration: InputDecoration(labelText: label, suffixText: 'mm'),
+        controller: controller,
+        inputFormatters: _numFormatters,
+        decoration: InputDecoration(labelText: label, suffixText: unit),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        onChanged: (v) => setState(() => onChanged(_toDouble(v, value))),
+        onTap: () => _selectAll(controller),
       ),
     );
   }
 
-  double _toDouble(String s, double fallback) =>
-      double.tryParse(s.replaceAll(',', '.')) ?? fallback;
+  // Zone quantité avec select-all + boutons
+  Widget _quantityField() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton.outlined(
+          onPressed: () {
+            final v = (quantite - 1).clamp(1, 999999);
+            setState(() {
+              quantite = v;
+              _qtyCtrl.text = '$v';
+              _selectAll(_qtyCtrl);
+            });
+          },
+          icon: const Icon(Icons.remove),
+        ),
+        SizedBox(
+          width: 90,
+          child: TextFormField(
+            controller: _qtyCtrl,
+            decoration: const InputDecoration(labelText: 'Qté'),
+            keyboardType: TextInputType.number,
+            onTap: () => _selectAll(_qtyCtrl),
+          ),
+        ),
+        IconButton.filled(
+          onPressed: () {
+            final v = (quantite + 1).clamp(1, 999999);
+            setState(() {
+              quantite = v;
+              _qtyCtrl.text = '$v';
+              _selectAll(_qtyCtrl);
+            });
+          },
+          icon: const Icon(Icons.add),
+        ),
+      ],
+    );
+  }
+
+  void _selectAll(TextEditingController c) {
+    c.selection = TextSelection(baseOffset: 0, extentOffset: c.text.length);
+  }
+
+  double _parseD(String s, double fallback) {
+    final v = double.tryParse(s.replaceAll(',', '.'));
+    return v == null || v.isNaN || v.isInfinite ? fallback : v;
+  }
+
+  void _syncPrixCtrlWithMatiere() {
+    final mat = selectedMatiere;
+    if (mat != null) {
+      final v = prixKg[mat] ?? 0;
+      _prixCtrl.text = v.toString();
+      _selectAll(_prixCtrl);
+    } else {
+      _prixCtrl.text = '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _lenCtrl.dispose();
+    _qtyCtrl.dispose();
+    _prixCtrl.dispose();
+    _dExtCtrl.dispose();
+    _epCtrl.dispose();
+    _coteCtrl.dispose();
+    _largCtrl.dispose();
+    _hautCtrl.dispose();
+    _dPleinCtrl.dispose();
+    _aileCtrl.dispose();
+    _aile2Ctrl.dispose();
+    super.dispose();
+  }
 }
 
 // ======== Widgets décoratifs ========
@@ -598,54 +725,6 @@ class SectionCard extends StatelessWidget {
           const SizedBox(height: 12),
           ...children,
         ]),
-      ),
-    );
-  }
-}
-
-class QuantityStepper extends StatelessWidget {
-  final int value;
-  final void Function(int) onChanged;
-  const QuantityStepper({super.key, required this.value, required this.onChanged});
-  @override
-  Widget build(BuildContext context) {
-    return Row(children: [
-      IconButton.outlined(onPressed: () => onChanged(value > 1 ? value - 1 : 1), icon: const Icon(Icons.remove)),
-      SizedBox(
-        width: 80,
-        child: TextFormField(
-          textAlign: TextAlign.center,
-          initialValue: value.toString(),
-          keyboardType: TextInputType.number,
-          onChanged: (v) => onChanged(int.tryParse(v) ?? value),
-        ),
-      ),
-      IconButton.filled(onPressed: () => onChanged(value + 1), icon: const Icon(Icons.add)),
-    ]);
-  }
-}
-
-class LabeledNumberField extends StatelessWidget {
-  final String label;
-  final String unit;
-  final double value;
-  final IconData? icon;
-  final void Function(double) onChanged;
-  const LabeledNumberField({super.key, required this.label, required this.unit, required this.value, required this.onChanged, this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 220,
-      child: TextFormField(
-        initialValue: value.toStringAsFixed(2),
-        decoration: InputDecoration(
-          labelText: label,
-          suffixText: unit,
-          prefixIcon: icon != null ? Icon(icon) : null,
-        ),
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        onChanged: (v) => onChanged(double.tryParse(v.replaceAll(',', '.')) ?? value),
       ),
     );
   }
