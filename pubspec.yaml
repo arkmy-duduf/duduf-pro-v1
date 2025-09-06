@@ -1,5 +1,5 @@
 name: duduf_occas
-description: Calcul poids & prix profils acier (Duduf Occas)
+description: Calcul poids & prix profils métallurgie (Duduf Occas)
 publish_to: "none"
 version: 1.0.0+1
 
@@ -9,7 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # (rien d'autre n'est requis pour l'instant)
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
@@ -23,10 +22,10 @@ flutter:
   assets:
     - assets/logo.png
 
-# Génération des icônes Android depuis assets/logo.png
+# Génération des icônes (Android) à partir de assets/logo.png
 flutter_icons:
   android: true
   ios: false
   image_path: assets/logo.png
-  adaptive_icon_background: "#1F2329"   # fond anthracite
+  adaptive_icon_background: "#1F2329"
   adaptive_icon_foreground: assets/logo.png
