@@ -20,7 +20,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/background.png
     - assets/logo.png
+
 
 # Génération des icônes (Android) à partir de assets/logo.png
 flutter_icons:

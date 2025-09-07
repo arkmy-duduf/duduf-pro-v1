@@ -12,7 +12,12 @@ class DudufOccasApp extends StatelessWidget {
     const steel = Color(0xFF2B2F36); // gris anthracite
     const steelDark = Color(0xFF1F2329);
     const steelLight = Color(0xFF3A3F47);
-    const accent = Color(0xFFFF8C1A); // orange chaud “atelier”
+    const accent = Color(0xFFFF8C1A); // orange atelier
+
+    final baseText = const TextStyle(
+      letterSpacing: .2,
+      height: 1.15,
+    );
 
     final colorScheme = ColorScheme.fromSeed(
       seedColor: accent,
@@ -52,26 +57,26 @@ class DudufOccasApp extends StatelessWidget {
             borderRadius: BorderRadius.all(Radius.circular(12)),
           ),
           filled: true,
-          fillColor: steel.withOpacity(0.6),
+          fillColor: steel.withOpacity(0.58),
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           labelStyle: TextStyle(color: Colors.white.withOpacity(0.9)),
         ),
-        cardTheme: CardThemeData(
-          color: steel.withOpacity(0.8),
+        cardTheme: const CardThemeData(
+          color: Color(0xE62B2F36),
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: const BorderRadius.all(Radius.circular(16)),
-            side: BorderSide(color: Colors.white.withOpacity(0.08)),
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+            side: BorderSide(color: Color(0x1FFFFFFF)),
           ),
         ),
-        filledButtonTheme: FilledButtonThemeData(
+        filledButtonTheme: const FilledButtonThemeData(
           style: ButtonStyle(
-            backgroundColor: const WidgetStatePropertyAll(accent),
-            foregroundColor: const WidgetStatePropertyAll(Colors.black),
+            backgroundColor: WidgetStatePropertyAll(accent),
+            foregroundColor: WidgetStatePropertyAll(Colors.black),
             shape: WidgetStatePropertyAll(
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(14))),
             ),
-            padding: const WidgetStatePropertyAll(
+            padding: WidgetStatePropertyAll(
               EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
           ),
@@ -90,13 +95,10 @@ class DudufOccasApp extends StatelessWidget {
             ),
           ),
         ),
-        navigationBarTheme: NavigationBarThemeData(
+        navigationBarTheme: const NavigationBarThemeData(
           height: 70,
           backgroundColor: steel,
-          indicatorColor: accent.withOpacity(0.15),
-          labelTextStyle: const WidgetStatePropertyAll(
-            TextStyle(fontWeight: FontWeight.w600),
-          ),
+          indicatorColor: Color(0x26FF8C1A),
         ),
       ),
       home: const DudufHomePage(),
@@ -142,9 +144,8 @@ class _DudufHomePageState extends State<DudufHomePage> {
   final _aile2Ctrl = TextEditingController(text: '40');
 
   // Filtre simple pour chiffres + , .
-  final List<TextInputFormatter> _numFormatters = [
-    FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]')),
-  ];
+  final List<TextInputFormatter> _numFormatters =
+      [FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]'))];
 
   // Tables normalisées (kg/m acier ≈ EN 10365 usuelles)
   final Map<String, Map<String, double>> poidsParMetre = {
@@ -318,11 +319,16 @@ class _DudufHomePageState extends State<DudufHomePage> {
     ];
     return Container(
       // Fond acier “brossé” simple (dégradé)
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
           colors: [Color(0xFF1A1D22), Color(0xFF0F1114)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+        ),
+        image: const DecorationImage(
+          image: AssetImage('assets/background.png'),
+          fit: BoxFit.cover,
+          colorFilter: ColorFilter.mode(Colors.black54, BlendMode.darken),
         ),
       ),
       child: Scaffold(
@@ -337,6 +343,10 @@ class _DudufHomePageState extends State<DudufHomePage> {
           centerTitle: true,
           backgroundColor: Colors.transparent,
           surfaceTintColor: Colors.transparent,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(2),
+          child: Container(height: 2, color: Colors.orangeAccent),
+        ),
         ),
         body: IndexedStack(index: _navIndex, children: pages),
         bottomNavigationBar: NavigationBar(
@@ -391,7 +401,7 @@ class _DudufHomePageState extends State<DudufHomePage> {
           ],
         ),
         if (pu != null)
-          _ResultBadge(title: 'Poids unitaire', value: '${pu.toStringAsFixed(2)} kg/m', icon: Icons.scale),
+          ResultBadge(title: 'Poids unitaire', value: '${pu.toStringAsFixed(2)} kg/m', icon: Icons.scale),
       ]),
     );
   }
@@ -536,6 +546,7 @@ class _DudufHomePageState extends State<DudufHomePage> {
             ),
             const SizedBox(height: 12),
             ListTile(
+              contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.info_outline),
               title: const Text('Densités (kg/m³)'),
               subtitle: Text(densites.entries.map((e) => '${e.key}: ${e.value.toStringAsFixed(0)}').join(' · ')),
@@ -604,9 +615,9 @@ class _DudufHomePageState extends State<DudufHomePage> {
               Chip(label: Text('Quantité: $quantite')),
             ]),
             const SizedBox(height: 16),
-            if (pu != null) _HeroTotal(value: '${fmtKg(pu)} kg/m', caption: 'Poids unitaire'),
+            if (pu != null) HeroTotal(value: '${fmtKg(pu)} kg/m', caption: 'Poids unitaire'),
             const SizedBox(height: 8),
-            if (total != null) _HeroTotal(value: '${fmtKg(total)} kg', caption: 'Poids total'),
+            if (total != null) HeroTotal(value: '${fmtKg(total)} kg', caption: 'Poids total'),
           ],
         ),
         const SizedBox(height: 12),
@@ -728,12 +739,59 @@ class _DudufHomePageState extends State<DudufHomePage> {
   }
 }
 
-// ======== Widgets décoratifs ========
-class _ResultBadge extends StatelessWidget {
+/// ======== Widgets “métal” ========
+
+class SectionCard extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+  const SectionCard({super.key, required this.title, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final titleStyle = Theme.of(context).textTheme.titleMedium!.copyWith(letterSpacing: .4);
+    return Card(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0x242B2F36), Color(0x332B2F36)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: cs.primary,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(title, style: titleStyle),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...children,
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class ResultBadge extends StatelessWidget {
   final String title;
   final String value;
   final IconData icon;
-  const _ResultBadge({required this.title, required this.value, required this.icon});
+  const ResultBadge({super.key, required this.title, required this.value, required this.icon});
 
   @override
   Widget build(BuildContext context) {
@@ -741,12 +799,12 @@ class _ResultBadge extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.10)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(children: [
-        Icon(icon, size: 28, color: cs.primary),
+        Icon(icon, size: 26, color: cs.primary),
         const SizedBox(width: 12),
         Expanded(child: Text(title)),
         Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -755,10 +813,10 @@ class _ResultBadge extends StatelessWidget {
   }
 }
 
-class _HeroTotal extends StatelessWidget {
+class HeroTotal extends StatelessWidget {
   final String value;
   final String caption;
-  const _HeroTotal({required this.value, required this.caption});
+  const HeroTotal({super.key, required this.value, required this.caption});
 
   @override
   Widget build(BuildContext context) {
@@ -766,34 +824,18 @@ class _HeroTotal extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [cs.primary, cs.primary.withOpacity(0.6)]),
-        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(colors: [cs.primary, cs.primary.withOpacity(0.55)]),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(color: cs.primary.withOpacity(0.28), blurRadius: 18, spreadRadius: 2),
+        ],
       ),
       child: Column(
         children: [
-          Text(value, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black)),
+          Text(value, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: Colors.black)),
           const SizedBox(height: 6),
-          Text(caption, style: const TextStyle(color: Colors.black87)),
+          Text(caption, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
         ],
-      ),
-    );
-  }
-}
-
-class SectionCard extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-  const SectionCard({super.key, required this.title, required this.children});
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 12),
-          ...children,
-        ]),
       ),
     );
   }
